@@ -12,11 +12,14 @@ def supersonic_nozzle(p0, t0, imax):
     
     A = 0.2 + 0.4*(1 + np.sin(np.pi*(x - 0.5)))
     A_star = 0.2 + 0.4*(1 + np.sin(np.pi*(-0.5)))
-    A_local = np.array([A[0], A[1], A[3], A[4]])
-    A_bar = A_local/A_star
+    # A_local = np.array([A[0], A[1], A[3], A[4]])
+    A_bar = A/A_star
     
-    M_new = np.array([0.8, 0.9, 8, 10]) # Mach number initial guess for newton solver
-    M_old, F_M, dF_dM, phi = np.zeros(4), np.ones(4), np.zeros(4), np.zeros(4)
+    M_new = x*1.4 + 1.6 # Mach number initial guess for newton solver
+    for i in range(int(imax/2)):
+        if M_new[i] >= 0.8:
+            M_new[i] = 0.5
+    M_old, F_M, dF_dM, phi = np.zeros(imax), np.ones(imax), np.zeros(imax), np.zeros(imax)
     
     const1 = 2/(gamma + 1)
     const2 = (gamma - 1)/2
