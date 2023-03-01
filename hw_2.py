@@ -25,6 +25,7 @@ x_intf = np.arange(-1, 1 + 1/imax, 2/imax)               # x-position of cell in
 x_intf[np.argmin(np.abs(x_intf))] = 0                    # set x = 0 at throat
 A_cell = 0.2 + 0.4*(1 + np.sin(np.pi*(x_cell - 0.5)))    # area at cell centers
 A_intf = 0.2 + 0.4*(1 + np.sin(np.pi*(x_intf - 0.5)))    # area at cell interfaces
+dA_dx  = 0.4*np.pi*np.cos(np.pi*x *np.pi*0.5)
 
 # ---------- Check case ----------
 
@@ -39,7 +40,7 @@ else:
 # ---------- Set inital conditions ----------
 
 center_array = np.zeros((3, imax + 2))    # Array of cell centers, even number, 2 ghost cells
-interface_array = np.zeros((3, imax + 3)) # Array of interfaces, odd number, face at throat, 2 ghost cells
+# interface_array = np.zeros((3, imax + 3)) # Array of interfaces, odd number, face at throat, 2 ghost cells
 cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easier indexing
 intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
 
@@ -54,4 +55,38 @@ psi = 1 + const1*M[0, cell_alias]**2
 center_array[2, cell_alias] = t0/psi                                                            # Set initial temperature
 center_array[1, cell_alias] = M[0, cell_alias]*np.sqrt(gamma*R_air*center_array[2, cell_alias]) # Set initial velocity
 p[0, cell_alias] = p0/psi**const2                                                               # Set initial pressure
-center_array[0, cell_alias] = p[0, cell_alias]/(R_air*center_array[2, cell_alias])
+center_array[0, cell_alias] = p[0, cell_alias]/(R_air*center_array[2, cell_alias])              # Set initial density
+
+# ---------- Set boundary conditions ----------
+
+def set_boundary_conditions():
+    center_array[:, 0] = 2*center_array[:, 1] - center_array[:, 2]
+    p[0, 0] = 2*p[0, 1] - p[0, 2]
+    M[0, 0] = 2*M[0, 1] - M[0, 2]                                   # left BCs by extrapolation
+    if M[0, 0] <= 0.11668889438289902/100:
+        M[0, 0] = 0.11668889438289902/100
+        print('---------- Corrected left extrapolated Mach number ----------')
+        
+    center_array[:, imax + 1] = 2*center_array[:, imax] - center_array[:, imax - 1]
+    if shock_flag == 0:
+        p[0, imax + 1] = 2*p[0, imax] - p[0, imax - 1]
+    else:
+        p[0, imax + 1] = 2*pback  - p[0, imax - 1]
+    M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]                  # right BCs by extrapolation
+    if M[0, 0] <= 0.11668889438289902/100:
+        M[0, 0] = 0.11668889438289902/100
+        print('---------- Corrected right extrapolated Mach number ----------')
+        
+    # possibly apply Mach limiter to whole domain?
+    
+set_boundary_conditions()
+
+# ---------- Construct conserved and flux vector ------------
+
+U = np.zeros(3, imax)
+U
+
+# ---------- Check iterative convergence ----------
+
+def check_iterative_convergence():
+    "bruh"
