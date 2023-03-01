@@ -1,4 +1,4 @@
-def supersonic_nozzle(p0, t0, imax):
+def supersonic_nozzle_exact_solution(p0, t0, imax):
 
     import numpy as np
     
@@ -27,17 +27,17 @@ def supersonic_nozzle(p0, t0, imax):
     const4 = 2/(gamma - 1)
     const5 = gamma/(gamma - 1)
     
-    while np.abs(F_M[0]) >= 1E-14 or np.abs(F_M[1]) >= 1E-14 or np.abs(F_M[2]) >= 1E-13 or np.abs(F_M[3]) >= 2*1E-13:
+    for i in range(30):  # ?? arbitrary no. of iterations (enough for convergence), not ideal, but had issues with array truth values
         M_old = M_new
         phi = const1 * (1 + const2*(M_old**2))
         F_M = phi**const3 - (A_bar**2)*(M_old**2)
         dF_dM = 2*M_old*(phi**const4 - A_bar**2)
         M_new = M_old - F_M/dF_dM
     
-    solution_vector = np.zeros((7,5))
-    solution_vector[0, :] = np.array((x[0], x[1], 0, x[2], x[3])) #x-position
+    solution_vector = np.zeros((7,imax))
+    solution_vector[0, :] = x #x-position
     solution_vector[1, :] = A #area
-    solution_vector[2, :] = np.array([M_new[0], M_new[1], 1, M_new[2], M_new[3]]) #Mach number
+    solution_vector[2, :] = M_new #Mach number
     
     psi = 1 + const2*solution_vector[2, :]**2
     
