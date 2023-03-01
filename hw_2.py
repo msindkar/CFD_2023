@@ -8,8 +8,12 @@ from hw_1_func import supersonic_nozzle_exact_solution
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
 gamma = 1.4
+R = 8314    # J/(kmol*K)
+m_air = 28.96 # 
+R_air = R/m_air # Specific gas constant for air
 
 const1 = (gamma - 1)/2
+const2 = gamma/(gamma - 1)
 
 # ---------- Set geometry ----------
 
@@ -22,8 +26,6 @@ x_intf[np.argmin(np.abs(x_intf))] = 0                    # set x = 0 at throat
 A_cell = 0.2 + 0.4*(1 + np.sin(np.pi*(x_cell - 0.5)))    # area at cell centers
 A_intf = 0.2 + 0.4*(1 + np.sin(np.pi*(x_intf - 0.5)))    # area at cell interfaces
 
-cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easier indexing
-intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
 # ---------- Check case ----------
 
 print('1 for isentropic case, anything else for shock case')
@@ -38,10 +40,18 @@ else:
 
 center_array = np.zeros((3, imax + 2))    # Array of cell centers, even number, 2 ghost cells
 interface_array = np.zeros((3, imax + 3)) # Array of interfaces, odd number, face at throat, 2 ghost cells
+cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easier indexing
+intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
 
-M = x_cell*1.4 + 1.6 # Mach number initial guess
-for i in range(int(imax/2)):
-    if M[i] >= 0.8:
-        M[i] = 0.5
+M = np.zeros((1, imax + 2))
+p = np.zeros((1, imax + 2))
+M[0, cell_alias] = x_cell*1.4 + 1.6 # Mach number initial guess
+for i in range(int((imax + 2)/2)):
+    if M[0, i] >= 0.8:
+        M[0, i] = 0.5
 
-psi = 1 + const1*M**2
+psi = 1 + const1*M[0, cell_alias]**2
+center_array[2, cell_alias] = t0/psi                                                            # Set initial temperature
+center_array[1, cell_alias] = M[0, cell_alias]*np.sqrt(gamma*R_air*center_array[2, cell_alias]) # Set initial velocity
+p[0, cell_alias] = p0/psi**const2                                                               # Set initial pressure
+center_array[0, cell_alias] = p[0, cell_alias]/(R_air*center_array[2, cell_alias])
