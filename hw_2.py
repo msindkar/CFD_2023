@@ -7,6 +7,7 @@ from hw_1_func import supersonic_nozzle_exact_solution
 
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
+rho0 = 1.7416406062063983 # Stagnation density, kg/m3 (calculated, check maybe?)
 gamma = 1.4
 R = 8314    # J/(kmol*K)
 m_air = 28.96 # 
@@ -14,7 +15,7 @@ R_air = R/m_air # Specific gas constant for air
 
 const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
-
+const3 = 2/(gamma - 1)
 # ---------- Set geometry ----------
 
 print('Enter number of cells (even number):')
@@ -25,7 +26,7 @@ x_intf = np.arange(-1, 1 + 1/imax, 2/imax)               # x-position of cell in
 x_intf[np.argmin(np.abs(x_intf))] = 0                    # set x = 0 at throat
 A_cell = 0.2 + 0.4*(1 + np.sin(np.pi*(x_cell - 0.5)))    # area at cell centers
 A_intf = 0.2 + 0.4*(1 + np.sin(np.pi*(x_intf - 0.5)))    # area at cell interfaces
-dA_dx  = 0.4*np.pi*np.cos(np.pi*x *np.pi*0.5)
+dA_dx  = 0.4*np.pi*np.cos(np.pi*x_cell + np.pi*0.5)
 
 # ---------- Check case ----------
 
@@ -83,8 +84,26 @@ set_boundary_conditions()
 
 # ---------- Construct conserved and flux vector ------------
 
-U = np.zeros(3, imax)
-U
+U = np.zeros((3, imax + 2))
+F = np.zeros((3, imax + 1))
+D = np.zeros((3, imax + 1))
+U[0, :] = center_array[0, :]                    # rho
+U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
+U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
+
+def compute_fluxes():
+    for i in range(imax + 1):
+        F[0, i] = (center_array[0, i]*center_array[1, i] + center_array[0, i + 1]*center_array[1, i + 1])/2
+        F[1, i] = (center_array[0, i]*center_array[1, i]**2 + p[0, i] + center_array[0, i + 1]*center_array[1, i + 1]**2 + p[0, i + 1])/2
+        F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
+
+def compute_mach():
+    M[0, cell_alias] = np.sqrt(const3*((rho0/center_array[0, :])**(gamma - 1) - 1))
+
+lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+
+def compute_dissipation():
+    ""
 
 # ---------- Check iterative convergence ----------
 
