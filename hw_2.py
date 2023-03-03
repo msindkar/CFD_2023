@@ -16,7 +16,7 @@ const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
-nmax = 10000 # no. of iterations
+nmax = 11 # no. of iterations
 cfl = 0.5
 kappa2 = 0.37
 kappa4 = 0.02
@@ -55,9 +55,9 @@ intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces
 M = np.zeros((1, imax + 2))
 p = np.zeros((1, imax + 2))
 M[0, cell_alias] = x_cell*1.4 + 1.6 # Mach number initial guess
-for i in range(int((imax + 2)/2)):
-    if M[0, i] >= 0.8:
-        M[0, i] = 0.5
+# for i in range(int((imax + 2)/2)):
+#     if M[0, i] >= 0.8:
+#         M[0, i] = 0.5
 
 psi                         = 1 + const1*M[0, cell_alias]**2
 center_array[2, cell_alias] = t0/psi                                                            # Set initial temperature
@@ -120,6 +120,8 @@ def compute_fluxes():
         F[0, i] = (center_array[0, i]*center_array[1, i] + center_array[0, i + 1]*center_array[1, i + 1])/2
         F[1, i] = (center_array[0, i]*center_array[1, i]**2 + p[0, i] + center_array[0, i + 1]*center_array[1, i + 1]**2 + p[0, i + 1])/2
         F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
+        
+compute_fluxes()
 
 D              = np.zeros((3, imax + 1))
 D2             = np.zeros((3, imax + 1))
@@ -129,6 +131,7 @@ nu             = np.zeros((1, imax + 2))
 p_extrapolated = np.zeros((1, imax + 4))
 epsilon2       = np.zeros((1, imax + 1))
 epsilon4       = np.zeros((1, imax + 1))
+lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
 
 def compute_dissipation():
     #lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
@@ -156,9 +159,9 @@ def compute_dissipation():
     
     D4[:, 0]        = 2*D4[:, 1] - D4[:, 1]
     D4[:, imax - 1] = 2*D4[:, imax - 2] - D4[:, imax - 3]
-    D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]    
-    
-    D = -(D2 - D4)
+    D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]
+
+D = -(D2 - D4)
 
 # ---------- Calculate initial residual (L2) ----------
 
@@ -172,27 +175,33 @@ init_norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
 init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
 init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
 
+norm = np.zeros((3, 1))
 def check_iterative_convergence():
-    "bruh"
+    norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
+    norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
+    norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
+    
+    print(str(j) + " " + str(norm[0]/init_norm[0]) + str(norm[1]/init_norm[1]) + str(norm[2]/init_norm[2]))
+
 
 # ---------- Compute timestep (local timestepping) ----------
 
 dt = np.zeros((1, imax))
-
-def compute_timestep():
-    dt = cfl*dx/lambda_max[cell_alias]
+#lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+dt = cfl*dx/lambda_max[cell_alias]
 
 # ---------- Main Loop ----------
 
 for j in range(nmax + 1):
-    lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
-    compute_timestep()
+    dt = cfl*dx/lambda_max[cell_alias]
     compute_fluxes()
     compute_dissipation()
+    D = -(D2 - D4)
+    S[1, :] = p[0, cell_alias]*dA_dx
     for i in range(imax):
         R_i[:, i] = (F[:, i + 1] + D[:, i + 1])*A_intf[i + 1] - (F[:, i] + D[:, i])*A_intf[i] - S[:, i]*dx
     U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
     compute_primitive_variables()
     set_boundary_conditions()
     reconstruct_U()
-    print(str(j))
+    check_iterative_convergence()
