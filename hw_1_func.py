@@ -27,7 +27,7 @@ def supersonic_nozzle_exact_solution(p0, t0, imax):
     const4 = 2/(gamma - 1)
     const5 = gamma/(gamma - 1)
     
-    for i in range(30):  # ?? arbitrary no. of iterations (enough for convergence), not ideal, but had issues with array truth values
+    for i in range(100):  # ?? arbitrary no. of iterations (enough for convergence), not ideal, but had issues with array truth values
         M_old = M_new
         phi = const1 * (1 + const2*(M_old**2))
         F_M = phi**const3 - (A_bar**2)*(M_old**2)

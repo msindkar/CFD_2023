@@ -16,6 +16,9 @@ R_air = R/m_air # Specific gas constant for air
 const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
+
+kappa2 = 0.37
+kappa4 = 0.02
 # ---------- Set geometry ----------
 
 print('Enter number of cells (even number):')
@@ -87,6 +90,8 @@ set_boundary_conditions()
 U = np.zeros((3, imax + 2))
 F = np.zeros((3, imax + 1))
 D = np.zeros((3, imax + 1))
+D2 = np.zeros((3, imax + 1))
+D4 = np.zeros((3, imax + 1))
 U[0, :] = center_array[0, :]                    # rho
 U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
 U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
@@ -98,13 +103,44 @@ def compute_fluxes():
         F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
 
 def compute_mach():
-    M[0, cell_alias] = np.sqrt(const3*((rho0/center_array[0, :])**(gamma - 1) - 1))
+    M[0, cell_alias] = np.sqrt(const3*((rho0/center_array[0, cell_alias])**(gamma - 1) - 1))
 
-lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+lambda_max = np.zeros((1, imax + 2))
+nu = np.zeros((1, imax + 2))
+p_extrapolated = np.zeros((1, imax + 4))
+epsilon2 = np.zeros((1, imax + 1))
+epsilon4 = np.zeros((1, imax + 1))
 
 def compute_dissipation():
-    ""
-
+    lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+    
+    p_extrapolated[0, 1:imax + 3] = p[0, :]
+    p_extrapolated[0, 0] = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
+    p_extrapolated[0, imax + 3] = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
+    
+    for i in range(imax + 2):
+        nu[0, i] = abs((p_extrapolated[0, i + 2] - 2*p_extrapolated[0, i + 1] + p[0, i])/(p_extrapolated[0, i + 2] + 2*p_extrapolated[0, i + 1] + p_extrapolated[0, i]))
+    
+    epsilon2[0, 0] = kappa2*max(nu[0, 0], nu[0, 1], nu[0, 2])
+    epsilon2[0, imax] = kappa2*max(nu[0, imax - 1], nu[0, imax], nu[0, imax + 1])
+    
+    for i in range(1, imax):
+        epsilon2[0, i] = kappa2*max(nu[0, i - 1], nu[0, i], nu[0, i + 1], nu[0, i + 2])
+        
+    epsilon4[0, :] = np.maximum((kappa4 - epsilon2), np.zeros((1, imax + 1)))
+    
+    for i in range(imax + 1):
+        D2[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon2[0, i]*(U[:, i + 1] - U[:, i])
+    
+    for i in range(1, imax - 1):
+        D4[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon4[0, i]*(U[:, i + 2] - 3*U[:, i + 1] + 3*U[:, i] - U[:, i - 1])
+    
+    D4[:, 0] = 2*D4[:, 1] - D4[:, 1]
+    D4[:, imax - 1] = 2*D4[:, imax - 2] - D4[:, imax - 3]
+    D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]    
+    
+    # D[:, 0] = 2*D[:, 1] - D[:, 2]
+    # D[:, imax] = 2*D[:, imax - 1] - D[:, imax - 2]
 # ---------- Check iterative convergence ----------
 
 def check_iterative_convergence():
