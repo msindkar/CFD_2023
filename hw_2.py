@@ -3,7 +3,6 @@
 
 import numpy as np
 from hw_1_func import supersonic_nozzle_exact_solution
-#import matplotlib as plt
 
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
@@ -17,6 +16,8 @@ const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
+nmax = 30000 # no. of iterations
+cfl = 0.5
 kappa2 = 0.37
 kappa4 = 0.02
 # ---------- Set geometry ----------
@@ -24,6 +25,7 @@ kappa4 = 0.02
 print('Enter number of cells (even number):')
 imax = int(input())
 
+dx = 2/imax
 x_cell = np.arange(-1 + 1/imax, 1 + 1/imax, 2/imax)      # x-position of cell centers
 x_intf = np.arange(-1, 1 + 1/imax, 2/imax)               # x-position of cell interfaces
 x_intf[np.argmin(np.abs(x_intf))] = 0                    # set x = 0 at throat
@@ -55,10 +57,10 @@ for i in range(int((imax + 2)/2)):
     if M[0, i] >= 0.8:
         M[0, i] = 0.5
 
-psi = 1 + const1*M[0, cell_alias]**2
+psi                         = 1 + const1*M[0, cell_alias]**2
 center_array[2, cell_alias] = t0/psi                                                            # Set initial temperature
 center_array[1, cell_alias] = M[0, cell_alias]*np.sqrt(gamma*R_air*center_array[2, cell_alias]) # Set initial velocity
-p[0, cell_alias] = p0/psi**const2                                                               # Set initial pressure
+p[0, cell_alias]            = p0/psi**const2                                                    # Set initial pressure
 center_array[0, cell_alias] = p[0, cell_alias]/(R_air*center_array[2, cell_alias])              # Set initial density
 
 # ---------- Set boundary conditions ----------
@@ -87,14 +89,25 @@ set_boundary_conditions()
 
 # ---------- Construct conserved and flux vector ------------
 
-U = np.zeros((3, imax + 2))
-F = np.zeros((3, imax + 1))
-D = np.zeros((3, imax + 1))
-D2 = np.zeros((3, imax + 1))
-D4 = np.zeros((3, imax + 1))
+# Compute source terms
+S       = np.zeros((3, imax))
+S[1, :] = p[0, cell_alias]*dA_dx
+# -----------
+
+U       = np.zeros((3, imax + 2))
 U[0, :] = center_array[0, :]                    # rho
 U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
 U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
+
+
+def compute_primitive_variables():  # CALL AFTER SOLVE        DOES CONSERVED VECTOR HAVE TO BE RECONSTRUCTED AFTER EACH SOLVE?
+    center_array[0, :] = U[0, :]
+    M[0, cell_alias]   = np.sqrt(const3*((rho0/center_array[0, cell_alias])**(gamma - 1) - 1))
+    center_array[1, :] = U[1, :]/center_array[0, :]
+    center_array[2, :] = t0/(1 + const1*M[0, :]**2)
+    p[0, :]            = p0*(center_array[2, :]/t0)**const2
+
+F = np.zeros((3, imax + 1))
 
 def compute_fluxes():
     for i in range(imax + 1):
@@ -102,26 +115,26 @@ def compute_fluxes():
         F[1, i] = (center_array[0, i]*center_array[1, i]**2 + p[0, i] + center_array[0, i + 1]*center_array[1, i + 1]**2 + p[0, i + 1])/2
         F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
 
-def compute_mach():
-    M[0, cell_alias] = np.sqrt(const3*((rho0/center_array[0, cell_alias])**(gamma - 1) - 1))
-
-lambda_max = np.zeros((1, imax + 2))
-nu = np.zeros((1, imax + 2))
+D              = np.zeros((3, imax + 1))
+D2             = np.zeros((3, imax + 1))
+D4             = np.zeros((3, imax + 1))
+lambda_max     = np.zeros((1, imax + 2))
+nu             = np.zeros((1, imax + 2))
 p_extrapolated = np.zeros((1, imax + 4))
-epsilon2 = np.zeros((1, imax + 1))
-epsilon4 = np.zeros((1, imax + 1))
+epsilon2       = np.zeros((1, imax + 1))
+epsilon4       = np.zeros((1, imax + 1))
 
 def compute_dissipation():
     lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
     
     p_extrapolated[0, 1:imax + 3] = p[0, :]
-    p_extrapolated[0, 0] = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
-    p_extrapolated[0, imax + 3] = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
+    p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
+    p_extrapolated[0, imax + 3]   = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
     
     for i in range(imax + 2):
         nu[0, i] = abs((p_extrapolated[0, i + 2] - 2*p_extrapolated[0, i + 1] + p[0, i])/(p_extrapolated[0, i + 2] + 2*p_extrapolated[0, i + 1] + p_extrapolated[0, i]))
     
-    epsilon2[0, 0] = kappa2*max(nu[0, 0], nu[0, 1], nu[0, 2])
+    epsilon2[0, 0]    = kappa2*max(nu[0, 0], nu[0, 1], nu[0, 2])
     epsilon2[0, imax] = kappa2*max(nu[0, imax - 1], nu[0, imax], nu[0, imax + 1])
     
     for i in range(1, imax):
@@ -135,13 +148,34 @@ def compute_dissipation():
     for i in range(1, imax - 1):
         D4[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon4[0, i]*(U[:, i + 2] - 3*U[:, i + 1] + 3*U[:, i] - U[:, i - 1])
     
-    D4[:, 0] = 2*D4[:, 1] - D4[:, 1]
+    D4[:, 0]        = 2*D4[:, 1] - D4[:, 1]
     D4[:, imax - 1] = 2*D4[:, imax - 2] - D4[:, imax - 3]
     D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]    
     
-    # D[:, 0] = 2*D[:, 1] - D[:, 2]
-    # D[:, imax] = 2*D[:, imax - 1] - D[:, imax - 2]
-# ---------- Check iterative convergence ----------
+    D = -(D2 - D4)
+
+# ---------- Calculate initial residual (L2) ----------
+
+init_norm = np.zeros((3, 1))
+R_i = np.zeros((3, imax))
+
+for i in range(imax):
+    R_i[:, i] = (F[:, i + 1] + D[:, i + 1])*A_intf[i + 1] - (F[:, i] + D[:, i])*A_intf[i] - S[:, i]*dx
+
+init_norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5
+init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5
+init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5
 
 def check_iterative_convergence():
     "bruh"
+
+# ---------- Compute timestep ----------
+
+dt = np.zeros((1, imax))
+
+def compute_timestep():
+    for i in range(imax):
+        dt[i] = 
+    
+for i in range(nmax + 1):
+    ""
