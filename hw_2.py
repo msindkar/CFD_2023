@@ -16,7 +16,7 @@ const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
-nmax = 30000 # no. of iterations
+nmax = 10000 # no. of iterations
 cfl = 0.5
 kappa2 = 0.37
 kappa4 = 0.02
@@ -32,6 +32,8 @@ x_intf[np.argmin(np.abs(x_intf))] = 0                    # set x = 0 at throat
 A_cell = 0.2 + 0.4*(1 + np.sin(np.pi*(x_cell - 0.5)))    # area at cell centers
 A_intf = 0.2 + 0.4*(1 + np.sin(np.pi*(x_intf - 0.5)))    # area at cell interfaces
 dA_dx  = 0.4*np.pi*np.cos(np.pi*x_cell + np.pi*0.5)
+
+V = A_cell*dx # cell volume based on areas a cell centers
 
 # ---------- Check case ----------
 
@@ -94,10 +96,14 @@ S       = np.zeros((3, imax))
 S[1, :] = p[0, cell_alias]*dA_dx
 # -----------
 
-U       = np.zeros((3, imax + 2))
-U[0, :] = center_array[0, :]                    # rho
-U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
-U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
+U = np.zeros((3, imax + 2))
+
+def reconstruct_U():
+    U[0, :] = center_array[0, :]                    # rho
+    U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
+    U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
+    
+reconstruct_U()
 
 
 def compute_primitive_variables():  # CALL AFTER SOLVE        DOES CONSERVED VECTOR HAVE TO BE RECONSTRUCTED AFTER EACH SOLVE?
@@ -125,7 +131,7 @@ epsilon2       = np.zeros((1, imax + 1))
 epsilon4       = np.zeros((1, imax + 1))
 
 def compute_dissipation():
-    lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+    #lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
     
     p_extrapolated[0, 1:imax + 3] = p[0, :]
     p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
@@ -162,20 +168,31 @@ R_i = np.zeros((3, imax))
 for i in range(imax):
     R_i[:, i] = (F[:, i + 1] + D[:, i + 1])*A_intf[i + 1] - (F[:, i] + D[:, i])*A_intf[i] - S[:, i]*dx
 
-init_norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5
-init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5
-init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5
+init_norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
+init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
+init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
 
 def check_iterative_convergence():
     "bruh"
 
-# ---------- Compute timestep ----------
+# ---------- Compute timestep (local timestepping) ----------
 
 dt = np.zeros((1, imax))
 
 def compute_timestep():
+    dt = cfl*dx/lambda_max[cell_alias]
+
+# ---------- Main Loop ----------
+
+for j in range(nmax + 1):
+    lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+    compute_timestep()
+    compute_fluxes()
+    compute_dissipation()
     for i in range(imax):
-        dt[i] = 
-    
-for i in range(nmax + 1):
-    ""
+        R_i[:, i] = (F[:, i + 1] + D[:, i + 1])*A_intf[i + 1] - (F[:, i] + D[:, i])*A_intf[i] - S[:, i]*dx
+    U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
+    compute_primitive_variables()
+    set_boundary_conditions()
+    reconstruct_U()
+    print(str(j))
