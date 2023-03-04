@@ -16,8 +16,8 @@ const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
-nmax = 100000 # no. of iterations
-cfl = 0.005
+nmax = 200000 # no. of iterations
+cfl = 0.01
 kappa2 = 0.5
 kappa4 = 1/32
 # ---------- Set geometry ----------
@@ -224,4 +224,6 @@ for j in range(nmax + 1):
     #reconstruct_U()
     check_iterative_convergence()
     if j == 20000:
-        cfl = 0.01
+        cfl = 0.05
+    if j == 30000:
+        cfl = 0.1
