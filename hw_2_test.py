@@ -16,10 +16,10 @@ const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
-nmax = 11 # no. of iterations
-cfl = 0.5
-kappa2 = 0.37
-kappa4 = 0.02
+nmax = 100000 # no. of iterations
+cfl = 0.005
+kappa2 = 0.5
+kappa4 = 1/32
 # ---------- Set geometry ----------
 
 print('Enter number of cells (even number):')
@@ -66,14 +66,14 @@ p[0, cell_alias]            = p0/psi**const2                                    
 center_array[0, cell_alias] = p[0, cell_alias]/(R_air*center_array[2, cell_alias])              # Set initial density
 
 # ---------- Set boundary conditions ----------
-
+j = 0
 def set_boundary_conditions():
     center_array[:, 0] = 2*center_array[:, 1] - center_array[:, 2]
     p[0, 0] = 2*p[0, 1] - p[0, 2]
     M[0, 0] = 2*M[0, 1] - M[0, 2]                                   # left BCs by extrapolation
-    if M[0, 0] <= 0.11668889438289902/100:
-        M[0, 0] = 0.11668889438289902/100
-        print('---------- Corrected left extrapolated Mach number ----------')
+    # if M[0, 0] <= 0.11668889438289902/100:
+    #     M[0, 0] = 0.11668889438289902/100
+    #     print('---------- Corrected left extrapolated Mach number ----------')
         
     center_array[:, imax + 1] = 2*center_array[:, imax] - center_array[:, imax - 1]
     if shock_flag == 0:
@@ -81,11 +81,26 @@ def set_boundary_conditions():
     else:
         p[0, imax + 1] = 2*pback  - p[0, imax - 1]
     M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]                  # right BCs by extrapolation
-    if M[0, 0] <= 0.11668889438289902/100:
-        M[0, 0] = 0.11668889438289902/100
-        print('---------- Corrected right extrapolated Mach number ----------')
+    # if M[0, imax + 1] <= 0.11668889438289902/100:
+    #     M[0, imax + 1] = 0.11668889438289902/100
+    #     print('---------- Corrected right extrapolated Mach number ----------')
+    
+    M[0, :][M[0, :] < 0.11668889438289902/100] = 0.11668889438289902/100
+    center_array[1, :][center_array[1, :] < 0.11668889438289902/100] = 0.11668889438289902/100
+    
+    
+    # if center_array[1, 0] <= 0.11668889438289902/100:
+    #     center_array[1, 0] = 0.11668889438289902/100
+    #     print('---------- Corrected left extrapolated velocity ----------')
         
+    # if center_array[1, imax + 1] <= 0.11668889438289902/100:
+    #     center_array[1, imax + 1] = 0.11668889438289902/100
+    #     print('---------- Corrected right extrapolated velocity ----------')
     # possibly apply Mach limiter to whole domain?
+    
+    # if j>= 10000:
+    #     M[0, :][M[0, :] < 0] = 0
+    #     center_array[1, :][center_array[1, :] < 0] = 0 
     
 set_boundary_conditions()
 
@@ -107,11 +122,13 @@ reconstruct_U()
 
 
 def compute_primitive_variables():  # CALL AFTER SOLVE        DOES CONSERVED VECTOR HAVE TO BE RECONSTRUCTED AFTER EACH SOLVE?
-    center_array[0, :] = U[0, :]
-    M[0, cell_alias]   = np.sqrt(const3*((rho0/center_array[0, cell_alias])**(gamma - 1) - 1))
-    center_array[1, :] = U[1, :]/center_array[0, :]
+    center_array[0, cell_alias] = U[0, cell_alias]
+    center_array[1, cell_alias] = U[1, cell_alias]/center_array[0, cell_alias]
+    p[0, cell_alias] = p0*(center_array[0, cell_alias]/rho0)**gamma
+    M[0, cell_alias] = center_array[1, cell_alias]/np.sqrt(gamma*p[0, cell_alias]/center_array[0, cell_alias])
+    #M[0, cell_alias]   = np.sqrt(const3*((rho0/center_array[0, cell_alias])**(gamma - 1) - 1))
     center_array[2, :] = t0/(1 + const1*M[0, :]**2)
-    p[0, :]            = p0*(center_array[2, :]/t0)**const2
+    #p[0, :]            = p0*(center_array[2, :]/t0)**const2
 
 F = np.zeros((3, imax + 1))
 
@@ -193,6 +210,7 @@ dt = cfl*dx/lambda_max[cell_alias]
 # ---------- Main Loop ----------
 
 for j in range(nmax + 1):
+    lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
     dt = cfl*dx/lambda_max[cell_alias]
     compute_fluxes()
     compute_dissipation()
@@ -203,5 +221,7 @@ for j in range(nmax + 1):
     U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
     compute_primitive_variables()
     set_boundary_conditions()
-    reconstruct_U()
+    #reconstruct_U()
     check_iterative_convergence()
+    if j == 20000:
+        cfl = 0.05
