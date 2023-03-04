@@ -31,7 +31,7 @@ x_intf = np.arange(-1, 1 + 1/imax, 2/imax)               # x-position of cell in
 x_intf[np.argmin(np.abs(x_intf))] = 0                    # set x = 0 at throat
 A_cell = 0.2 + 0.4*(1 + np.sin(np.pi*(x_cell - 0.5)))    # area at cell centers
 A_intf = 0.2 + 0.4*(1 + np.sin(np.pi*(x_intf - 0.5)))    # area at cell interfaces
-dA_dx  = 0.4*np.pi*np.cos(np.pi*x_cell + np.pi*0.5)
+dA_dx  = 0.4*np.pi*np.cos(np.pi*x_cell - np.pi*0.5)
 
 V = A_cell*dx # cell volume based on areas a cell centers
 
@@ -55,9 +55,9 @@ intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces
 M = np.zeros((1, imax + 2))
 p = np.zeros((1, imax + 2))
 M[0, cell_alias] = x_cell*1.4 + 1.6 # Mach number initial guess
-# for i in range(int((imax + 2)/2)):
-#     if M[0, i] >= 0.8:
-#         M[0, i] = 0.5
+for i in range(int((imax + 2)/2)):
+    if M[0, i] >= 1:
+        M[0, i] = 0.99
 
 psi                         = 1 + const1*M[0, cell_alias]**2
 center_array[2, cell_alias] = t0/psi                                                            # Set initial temperature
@@ -66,7 +66,7 @@ p[0, cell_alias]            = p0/psi**const2                                    
 center_array[0, cell_alias] = p[0, cell_alias]/(R_air*center_array[2, cell_alias])              # Set initial density
 
 # ---------- Set boundary conditions ----------
-j = 0
+# j = 0
 def set_boundary_conditions():
     center_array[:, 0] = 2*center_array[:, 1] - center_array[:, 2]
     p[0, 0] = 2*p[0, 1] - p[0, 2]
@@ -86,7 +86,7 @@ def set_boundary_conditions():
     #     print('---------- Corrected right extrapolated Mach number ----------')
     
     M[0, :][M[0, :] < 0.11668889438289902/100] = 0.11668889438289902/100
-    center_array[1, :][center_array[1, :] < 0.11668889438289902/100] = 0.11668889438289902/100
+    center_array[1, :][center_array[1, :] < 57.2706378650403/100] = 57.2706378650403/100
     
     
     # if center_array[1, 0] <= 0.11668889438289902/100:
@@ -224,4 +224,4 @@ for j in range(nmax + 1):
     #reconstruct_U()
     check_iterative_convergence()
     if j == 20000:
-        cfl = 0.05
+        cfl = 0.01
