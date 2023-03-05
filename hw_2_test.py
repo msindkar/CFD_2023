@@ -48,16 +48,15 @@ else:
 # ---------- Set inital conditions ----------
 
 center_array = np.zeros((3, imax + 2))    # Array of cell centers, even number, 2 ghost cells
-# interface_array = np.zeros((3, imax + 3)) # Array of interfaces, odd number, face at throat, 2 ghost cells
 cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easier indexing
 intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
 
 M = np.zeros((1, imax + 2))
 p = np.zeros((1, imax + 2))
 M[0, cell_alias] = x_cell*1.4 + 1.6 # Mach number initial guess
-for i in range(int((imax + 2)/2)):
-    if M[0, i] >= 1:
-        M[0, i] = 0.99
+# for i in range(int((imax + 2)/2)):
+#     if M[0, i] >= 1:
+#         M[0, i] = 0.99
 
 psi                         = 1 + const1*M[0, cell_alias]**2
 center_array[2, cell_alias] = t0/psi                                                            # Set initial temperature
@@ -71,9 +70,6 @@ def set_boundary_conditions():
     center_array[:, 0] = 2*center_array[:, 1] - center_array[:, 2]
     p[0, 0] = 2*p[0, 1] - p[0, 2]
     M[0, 0] = 2*M[0, 1] - M[0, 2]                                   # left BCs by extrapolation
-    # if M[0, 0] <= 0.11668889438289902/100:
-    #     M[0, 0] = 0.11668889438289902/100
-    #     print('---------- Corrected left extrapolated Mach number ----------')
         
     center_array[:, imax + 1] = 2*center_array[:, imax] - center_array[:, imax - 1]
     if shock_flag == 0:
@@ -81,26 +77,9 @@ def set_boundary_conditions():
     else:
         p[0, imax + 1] = 2*pback  - p[0, imax - 1]
     M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]                  # right BCs by extrapolation
-    # if M[0, imax + 1] <= 0.11668889438289902/100:
-    #     M[0, imax + 1] = 0.11668889438289902/100
-    #     print('---------- Corrected right extrapolated Mach number ----------')
     
     M[0, :][M[0, :] < 0.11668889438289902/100] = 0.11668889438289902/100
     center_array[1, :][center_array[1, :] < 57.2706378650403/100] = 57.2706378650403/100
-    
-    
-    # if center_array[1, 0] <= 0.11668889438289902/100:
-    #     center_array[1, 0] = 0.11668889438289902/100
-    #     print('---------- Corrected left extrapolated velocity ----------')
-        
-    # if center_array[1, imax + 1] <= 0.11668889438289902/100:
-    #     center_array[1, imax + 1] = 0.11668889438289902/100
-    #     print('---------- Corrected right extrapolated velocity ----------')
-    # possibly apply Mach limiter to whole domain?
-    
-    # if j>= 10000:
-    #     M[0, :][M[0, :] < 0] = 0
-    #     center_array[1, :][center_array[1, :] < 0] = 0 
     
 set_boundary_conditions()
 
@@ -113,22 +92,16 @@ S[1, :] = p[0, cell_alias]*dA_dx
 
 U = np.zeros((3, imax + 2))
 
-def reconstruct_U():
-    U[0, :] = center_array[0, :]                    # rho
-    U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
-    U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
-    
-reconstruct_U()
+U[0, :] = center_array[0, :]                    # rho
+U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
+U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
 
-
-def compute_primitive_variables():  # CALL AFTER SOLVE        DOES CONSERVED VECTOR HAVE TO BE RECONSTRUCTED AFTER EACH SOLVE?
+def compute_primitive_variables():
     center_array[0, cell_alias] = U[0, cell_alias]
     center_array[1, cell_alias] = U[1, cell_alias]/center_array[0, cell_alias]
     p[0, cell_alias] = p0*(center_array[0, cell_alias]/rho0)**gamma
     M[0, cell_alias] = center_array[1, cell_alias]/np.sqrt(gamma*p[0, cell_alias]/center_array[0, cell_alias])
-    #M[0, cell_alias]   = np.sqrt(const3*((rho0/center_array[0, cell_alias])**(gamma - 1) - 1))
     center_array[2, :] = t0/(1 + const1*M[0, :]**2)
-    #p[0, :]            = p0*(center_array[2, :]/t0)**const2
 
 F = np.zeros((3, imax + 1))
 
@@ -151,8 +124,6 @@ epsilon4       = np.zeros((1, imax + 1))
 lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
 
 def compute_dissipation():
-    #lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
-    
     p_extrapolated[0, 1:imax + 3] = p[0, :]
     p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
     p_extrapolated[0, imax + 3]   = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
@@ -180,7 +151,7 @@ def compute_dissipation():
 
 D = -(D2 - D4)
 
-# ---------- Calculate initial residual (L2) ----------
+# ---------- Calculate residual (L2) ----------
 
 init_norm = np.zeros((3, 1))
 R_i = np.zeros((3, imax))
@@ -193,21 +164,63 @@ init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
 init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
 
 norm = np.zeros((3, 1))
+res = np.zeros((3, 1))
+
 def check_iterative_convergence():
     norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
     norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
     norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
     
-    print(str(j) + " " + str(norm[0]/init_norm[0]) + str(norm[1]/init_norm[1]) + str(norm[2]/init_norm[2]))
+    res[0] = norm[0]/init_norm[0]
+    res[1] = norm[1]/init_norm[1]
+    res[2] = norm[2]/init_norm[2]
+    
+    if j%100 == 0:
+        f1.write(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + '\n')
+    
+    print(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])))        
 
+# ---------- Compute DE L2 norm ----------
+
+def de_norms():
+    DE = np.zeros((3, imax))
+    DE_norm = np.zeros((3, 1))
+    
+    DE[0, :] = np.abs(exact_solution[5, :] -  center_array[0, cell_alias])
+    DE[1, :] = np.abs(exact_solution[6, :] -  center_array[1, cell_alias])
+    DE[2, :] = np.abs(exact_solution[3, :] -  center_array[2, cell_alias])
+    
+    DE_norm[0] = np.sqrt((np.sum(DE[0, :]**2))/imax)**0.5
+    DE_norm[1] = np.sqrt((np.sum(DE[1, :]**2))/imax)**0.5
+    DE_norm[2] = np.sqrt((np.sum(DE[2, :]**2))/imax)**0.5
+    
+    print('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'T = ' + str(float(DE_norm[2])))
+# ---------- Write to file ----------
+
+def write_to_file():
+    f.write('zone T="' + str(j) + '"\n')
+    f.write('I=' + str(imax) + '\n')
+    f.write('DATAPACKING=POINT\n')
+    f.write('DT=(DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE)\n')
+    for g in range(imax):
+        f.write(str(float(x_cell[g]))  + " " +  str(float(A_cell[g]))  + " " +  str(float(M[0, g]))  + " " +  str(float(center_array[0, g]))  + " " +  str(float(center_array[1, g]))  + " " +  str(float(center_array[2, g]))  + " " +  str(float(p[0, g])) + '\n')
 
 # ---------- Compute timestep (local timestepping) ----------
 
 dt = np.zeros((1, imax))
-#lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
 dt = cfl*dx/lambda_max[cell_alias]
 
 # ---------- Main Loop ----------
+
+print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
+
+f = open('soln.dat', 'a')
+f.write('TITLE = "Quasi-1D Nozzle Solution"\n')
+f.write('variables="x(m)""Area(m^2)""Mach""rho(kg/m^3)""u(m/s)""T(K)""Press(N/m^2)"\n')
+
+f1 = open('res.dat', 'a')
+f1.write('TITLE = "Quasi-1D Nozzle Residuals"\n')
+f1.write('variables="Iteration""Coninuity""X-momentum""Energy"\n')
 
 for j in range(nmax + 1):
     lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
@@ -221,9 +234,16 @@ for j in range(nmax + 1):
     U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
     compute_primitive_variables()
     set_boundary_conditions()
-    #reconstruct_U()
     check_iterative_convergence()
+    if j%2000 == 0:
+        write_to_file()
     if j == 20000:
         cfl = 0.05
     if j == 30000:
         cfl = 0.1
+    if res[1] <= 1E-12:
+        print('Solution converged in ' + str(j) + ' iterations')
+        break
+
+f.close()
+f1.close()
