@@ -11,13 +11,14 @@ gamma = 1.4
 R = 8314    # J/(kmol*K)
 m_air = 28.96 # 
 R_air = R/m_air # Specific gas constant for air
+pback = 1.2E5
 
 const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
 nmax = 200000 # no. of iterations
-cfl = 0.05
+cfl = 0.01
 kappa2 = 0.5
 kappa4 = 1/32
 # ---------- Set geometry ----------
@@ -43,7 +44,7 @@ if int(input()) == 1:
     exact_solution = supersonic_nozzle_exact_solution(p0, t0, imax)
 else:
     shock_flag = 1
-    pback = 1.2E5 # Back pressure for shock case, Pa
+    #pback = 1.2E5 # Back pressure for shock case, Pa
     
 # ---------- Set inital conditions ----------
 
@@ -75,7 +76,7 @@ def set_boundary_conditions():
     if shock_flag == 0:
         p[0, imax + 1] = 2*p[0, imax] - p[0, imax - 1]
     else:
-        p[0, imax + 1] = 2*pback  - p[0, imax - 1]
+        p[0, imax + 1] = 2*pback  - p[0, imax]
     M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]                  # right BCs by extrapolation
     
     M[0, :][M[0, :] < 0.11668889438289902/100] = 0.11668889438289902/100
@@ -110,7 +111,9 @@ def compute_fluxes():
         F[0, i] = (center_array[0, i]*center_array[1, i] + center_array[0, i + 1]*center_array[1, i + 1])/2
         F[1, i] = (center_array[0, i]*center_array[1, i]**2 + p[0, i] + center_array[0, i + 1]*center_array[1, i + 1]**2 + p[0, i + 1])/2
         F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
-        
+        # F[0, i] = center_array[0, i]*center_array[1, i]
+        # F[1, i] = center_array[0, i]*center_array[1, i]**2 + p[0, i]
+        # F[2, i] = const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3
 compute_fluxes()
 
 D              = np.zeros((3, imax + 1))
@@ -186,15 +189,18 @@ def de_norms():
     DE = np.zeros((3, imax))
     DE_norm = np.zeros((3, 1))
     
-    DE[0, :] = np.abs(exact_solution[5, :] -  center_array[0, cell_alias])
-    DE[1, :] = np.abs(exact_solution[6, :] -  center_array[1, cell_alias])
-    DE[2, :] = np.abs(exact_solution[3, :] -  center_array[2, cell_alias])
+    DE[0, :] = exact_solution[5, :] -  center_array[0, cell_alias]
+    DE[1, :] = exact_solution[6, :] -  center_array[1, cell_alias]
+    DE[2, :] = exact_solution[3, :] -  center_array[2, cell_alias]
     
-    DE_norm[0] = np.sqrt((np.sum(DE[0, :]**2))/imax)**0.5
-    DE_norm[1] = np.sqrt((np.sum(DE[1, :]**2))/imax)**0.5
-    DE_norm[2] = np.sqrt((np.sum(DE[2, :]**2))/imax)**0.5
-    
+    DE_norm[0] = ((np.sum(DE[0, :]**2))/imax)**0.5
+    DE_norm[1] = ((np.sum(DE[1, :]**2))/imax)**0.5
+    DE_norm[2] = ((np.sum(DE[2, :]**2))/imax)**0.5
+
+    f3 = open('DE_norms.txt', 'a')
     print('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'T = ' + str(float(DE_norm[2])))
+    f3.write('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'T = ' + str(float(DE_norm[2])))
+    f3.close()
 # ---------- Write to file ----------
 
 def write_to_file():
@@ -238,12 +244,14 @@ for j in range(nmax + 1):
     if j%2000 == 0:
         write_to_file()
     if j == 20000:
+        cfl = 0.05
+    if j == 30000:
         cfl = 0.1
-    # if j == 30000:
-    #     cfl = 0.1
-    if res[1] <= 1E-10 and res[0] <=1E-10:
+    if res[0] <= 1E-12:
         print('Solution converged in ' + str(j) + ' iterations')
         break
 
 f.close()
 f1.close()
+if shock_flag == 0:
+    de_norms()
