@@ -85,6 +85,27 @@ def set_boundary_conditions():
     
 set_boundary_conditions()
 
+def try_boundary_conditions():
+    M[0, 0] = 2*M[0, 1] - M[0, 2] 
+    M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]
+    
+    psi1 = 1 + const1*M[0, 0]**2
+    center_array[2, 0] = t0/psi1                                                            # Set initial temperature
+    center_array[1, 0] = M[0, 0]*np.sqrt(gamma*R_air*center_array[2, 0])                    # Set initial velocity
+    p[0, 0]            = p0/psi1**const2                                                    # Set initial pressure
+    center_array[0, 0] = p[0, 0]/(R_air*center_array[2, 0])
+    
+    psi2 = 1 + const1*M[0, imax + 1]**2
+    center_array[2, imax + 1] = t0/psi2                                                            # Set initial temperature
+    center_array[1, imax + 1] = M[0, imax + 1]*np.sqrt(gamma*R_air*center_array[2, imax + 1])      # Set initial velocity
+    p[0, imax + 1]            = p0/psi2**const2                                                    # Set initial pressure
+    center_array[0, imax + 1] = p[0, imax + 1]/(R_air*center_array[2, imax + 1])
+    
+    M[0, :][M[0, :] < 0.11668889438289902/100] = 0.11668889438289902/100
+    center_array[1, :][center_array[1, :] < 57.2706378650403/100] = 57.2706378650403/100
+
+#try_boundary_conditions()
+
 # ---------- Construct conserved and flux vector ------------
 
 # Compute source terms
@@ -126,14 +147,22 @@ p_extrapolated = np.zeros((1, imax + 4))
 epsilon2       = np.zeros((1, imax + 1))
 epsilon4       = np.zeros((1, imax + 1))
 lambda_max = center_array[1, :] + center_array[1, :]/M[0, :]
+M_extrapolated = np.zeros((1, imax + 4))
 
 def compute_dissipation():
-    p_extrapolated[0, 1:imax + 3] = p[0, :]
-    p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
-    p_extrapolated[0, imax + 3]   = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
+    M_extrapolated[0, 1:imax + 3] = M[0, :]
+    M_extrapolated[0, 0]          = 2*M_extrapolated[0, 1] - M_extrapolated[0, 2]
+    M_extrapolated[0, imax + 3]   = 2*M_extrapolated[0, imax + 2]  - M_extrapolated[0, imax + 1]
+    
+    p_extrapolated = p0/(1 + const1*M_extrapolated[0, :]**2)**const2
+    
+    # p_extrapolated[0, 1:imax + 3] = p[0, :]
+    # p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
+    # p_extrapolated[0, imax + 3]   = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
     
     for i in range(imax + 2):
-        nu[0, i] = abs((p_extrapolated[0, i + 2] - 2*p_extrapolated[0, i + 1] + p[0, i])/(p_extrapolated[0, i + 2] + 2*p_extrapolated[0, i + 1] + p_extrapolated[0, i]))
+        # nu[0, i] = abs((p_extrapolated[0, i + 2] - 2*p_extrapolated[0, i + 1] + p[0, i])/(p_extrapolated[0, i + 2] + 2*p_extrapolated[0, i + 1] + p_extrapolated[0, i]))
+        nu[0, i] = abs((p_extrapolated[i + 2] - 2*p_extrapolated[i + 1] + p[0, i])/(p_extrapolated[i + 2] + 2*p_extrapolated[i + 1] + p_extrapolated[i]))
     
     epsilon2[0, 0]    = kappa2*max(nu[0, 0], nu[0, 1], nu[0, 2])
     epsilon2[0, imax] = kappa2*max(nu[0, imax - 1], nu[0, imax], nu[0, imax + 1])
@@ -240,6 +269,7 @@ for j in range(nmax + 1):
         R_i[:, i] = (F[:, i + 1] + D[:, i + 1])*A_intf[i + 1] - (F[:, i] + D[:, i])*A_intf[i] - S[:, i]*dx
     U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
     compute_primitive_variables()
+    #try_boundary_conditions()
     set_boundary_conditions()
     check_iterative_convergence()
     if j%2000 == 0:
@@ -248,7 +278,7 @@ for j in range(nmax + 1):
         cfl = 0.05
     if j == 30000:
         cfl = 0.1
-    if res[0] <= 1E-10:
+    if res[0] <= 1E-10 and res[1] <= 1E-10 and res[2] <= 1E-10 :
         print('Solution converged in ' + str(j) + ' iterations')
         break
 
