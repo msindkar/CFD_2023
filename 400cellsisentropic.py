@@ -55,6 +55,7 @@ intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces
 M = np.zeros((1, imax + 2))
 p = np.zeros((1, imax + 2))
 M[0, cell_alias] = x_cell*1.4 + 1.6 # Mach number initial guess
+#M[0, cell_alias] = x_cell*0.9 + 1
 # for i in range(int((imax + 2)/2)):
 #     if M[0, i] >= 1:
 #         M[0, i] = 0.99
@@ -247,7 +248,7 @@ for j in range(nmax + 1):
         cfl = 0.05
     if j == 30000:
         cfl = 0.1
-    if res[0] <= 1E-12:
+    if res[0] <= 1E-10:
         print('Solution converged in ' + str(j) + ' iterations')
         break
 
