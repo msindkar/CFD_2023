@@ -140,3 +140,9 @@ def primitive_to_conserved_variables():
     conserved_variables[2, :] = primitive_variables[2, cell_alias]/(gamma - 1) + 0.5*primitive_variables[0, cell_alias]*(primitive_variables[1, cell_alias]**2)
     
 #primitive_to_conserved_variables()
+
+def source_terms():
+    S       = np.zeros((3, imax))
+    S[1, :] = primitive_variables[2, cell_alias]*dA_dx
+    
+#source_terms()
