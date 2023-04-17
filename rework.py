@@ -17,8 +17,8 @@ pback = 1.2E5
 # const2 = gamma/(gamma - 1)
 # const3 = 2/(gamma - 1)
 
-nmax = 200000 # no. of iterations
-cfl = 0.01
+nmax = 10000 # no. of iterations
+cfl = 0.1
 kappa2 = 0.5
 kappa4 = 1/32
 # ---------- Set geometry ----------
@@ -126,7 +126,7 @@ def van_leer_1st_order_flux():
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
-#van_leer_1st_order_flux()
+van_leer_1st_order_flux()
 
 # ---------- ---------- ---------- ---------- ---------- ----------
 # TRY TO REDUCE ROUND OFF ERROR
@@ -139,30 +139,30 @@ def primitive_to_conserved_variables():
     conserved_variables[1, :] = primitive_variables[0, cell_alias]*primitive_variables[1, cell_alias]
     conserved_variables[2, :] = primitive_variables[2, cell_alias]/(gamma - 1) + 0.5*primitive_variables[0, cell_alias]*(primitive_variables[1, cell_alias]**2)
     
-#primitive_to_conserved_variables()
+primitive_to_conserved_variables()
 
 def conserved_to_primitive_variables():
     primitive_variables[0, cell_alias] = conserved_variables[0, :]
     primitive_variables[1, cell_alias] = conserved_variables[1, :]/conserved_variables[0, :]
     primitive_variables[2, cell_alias] = (gamma - 1)*conserved_variables[2, :] - 0.5*(gamma - 1)*(conserved_variables[1, :]**2)/(conserved_variables[0, :])
     
-#conserved_to_primitive_variables()
+conserved_to_primitive_variables()
 
 S = np.zeros((3, imax))
 
 def source_terms():
     S[1, :] = primitive_variables[2, cell_alias]*dA_dx
     
-#source_terms()
+source_terms()
 
 dt = np.zeros((1, imax))
 lambda_max = np.zeros((1, imax))
 
 def compute_time_step():
     lambda_max[0, :] = np.abs(primitive_variables[1, cell_alias]) + a[0, cell_alias]
-    dt = cfl*(dx/lambda_max)
+    dt[0, :] = cfl*(dx/lambda_max)
     
-#compute_time_step()
+compute_time_step()
 
 # def write_to_file():
 #     f.write('zone T="' + str(j) + '"\n')
@@ -188,11 +188,7 @@ init_norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
 init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
 init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
 
-j = 0
-
 def check_iterative_convergence():
-    for i in range(imax):
-        R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
     
     norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
     norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
@@ -217,3 +213,17 @@ def check_iterative_convergence():
 # f1.write('TITLE = "Quasi-1D Nozzle Residuals"\n')
 # f1.write('variables="Iteration""Coninuity""X-momentum""Energy"\n')
 
+#U_old = np.zeros((3, imax))
+
+for j in range(nmax + 1):
+    upwind_boundary_conditions()
+    van_leer_1st_order_flux()
+    compute_time_step()
+    source_terms()
+    primitive_to_conserved_variables()
+    #U_old = 
+    for i in range(imax):
+        R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
+    conserved_variables = conserved_variables - R_i*(dt/V)
+    conserved_to_primitive_variables()
+    check_iterative_convergence()
