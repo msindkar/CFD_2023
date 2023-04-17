@@ -65,3 +65,24 @@ a[0, cell_alias] = (gamma*R_air*T[0, cell_alias])**(0.5)
 primitive_variables[1, cell_alias] = M[0, cell_alias]*a[0, cell_alias]
 
 # ---------- ---------- ----------
+
+def upwind_boundary_conditions():
+    M[0, 0] = 2*M[0, 1] - M[0, 2]
+    
+    psi_bc_0 = 1 + ((gamma - 1)/2)*M[0, 0]**2
+    T[0, 0] = t0/psi_bc_0
+    primitive_variables[2, 0] = p0/(psi_bc_0**(gamma/(gamma - 1)))
+    primitive_variables[0, 0] = primitive_variables[2, 0]/(R_air*T[:, 0])
+    a[0, 0] = (gamma*R_air*T[0, 0])**(0.5)
+    primitive_variables[1, 0] = M[0, 0]*a[0, 0]
+    
+    M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]
+    
+    psi_bc_1 = 1 + ((gamma - 1)/2)*M[0, imax + 1]**2
+    T[0, imax + 1] = t0/psi_bc_1
+    primitive_variables[2, imax + 1] = p0/(psi_bc_1**(gamma/(gamma - 1)))
+    primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
+    a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(0.5)
+    primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
+
+upwind_boundary_conditions()
