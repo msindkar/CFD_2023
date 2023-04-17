@@ -153,3 +153,11 @@ def source_terms():
     S[1, :] = primitive_variables[2, cell_alias]*dA_dx
     
 #source_terms()
+
+dt = np.zeros((1, imax))
+
+def compute_time_step():
+    lambda_max = np.abs(primitive_variables[1, cell_alias]) + a[0, cell_alias]
+    dt = cfl*(dx/lambda_max)
+    
+#compute_time_step()
