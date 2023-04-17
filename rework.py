@@ -54,6 +54,8 @@ cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easi
 M = np.zeros((1, imax + 2))
 T = np.zeros((1, imax + 2))
 a = np.zeros((1, imax + 2))
+ht = np.zeros((1, imax + 2))
+et = np.zeros((1, imax + 2))
 
 M[0, cell_alias] = x_cell*1.4 + 1.6
 
@@ -63,6 +65,9 @@ primitive_variables[2, cell_alias] = p0/(psi**(gamma/(gamma - 1)))
 primitive_variables[0, cell_alias] = primitive_variables[2, cell_alias]/(R_air*T[:, cell_alias])
 a[0, cell_alias] = (gamma*R_air*T[0, cell_alias])**(0.5)
 primitive_variables[1, cell_alias] = M[0, cell_alias]*a[0, cell_alias]
+
+ht[0, cell_alias] = ((gamma*R_air)/(gamma - 1))*T[0, cell_alias] + (primitive_variables[1, cell_alias]**2)/2
+et[0, cell_alias] = ht[0, cell_alias] - (primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])
 
 # ---------- ---------- ----------
 
@@ -74,7 +79,10 @@ def upwind_boundary_conditions():
     primitive_variables[2, 0] = p0/(psi_bc_0**(gamma/(gamma - 1)))
     primitive_variables[0, 0] = primitive_variables[2, 0]/(R_air*T[:, 0])
     a[0, 0] = (gamma*R_air*T[0, 0])**(0.5)
-    primitive_variables[1, 0] = M[0, 0]*a[0, 0]
+    primitive_variables[1, 0] = M[0, 0]*a[0, 0]\
+    
+    ht[0, 0] = ((gamma*R_air)/(gamma - 1))*T[0, 0] + (primitive_variables[1, 0]**2)/2
+    et[0, 0] = ht[0, 0] - (primitive_variables[2, 0]/primitive_variables[0, 0])
     
     M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]
     
@@ -84,5 +92,38 @@ def upwind_boundary_conditions():
     primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
     a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(0.5)
     primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
+    
+    ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
+    et[0, imax + 1] = ht[0, imax + 1] - (primitive_variables[2, imax + 1]/primitive_variables[0, imax + 1])
 
 upwind_boundary_conditions()
+
+F = np.zeros((3, imax + 1))
+
+def van_leer_1st_order_flux():
+    for i in range(imax + 1):
+        M_L = primitive_variables[1, i]/a[0, i]
+        M_R = primitive_variables[1, i + 1]/a[0, i + 1]
+        M_plus = (1/4)*(M_L + 1)**2
+        M_minus = -(1/4)*(M_R - 1)**2
+        beta_L = -max(0, (1 - int(M_L)))
+        beta_R = -max(0, (1 - int(M_R)))
+        alpha_plus = (1/2)*(1 + np.sign(M_L))
+        alpha_minus = (1/2)*(1 - np.sign(M_R))
+        c_plus = alpha_plus*(1 + beta_L)*M_L - beta_L*M_plus
+        c_minus = alpha_minus*(1 + beta_R)*M_R - beta_R*M_minus
+        
+        F_C_p = primitive_variables[0, i]*a[0, i]*c_plus*np.array([1, primitive_variables[1, i], ht[0, i]])
+        F_C_m = primitive_variables[0, i + 1]*a[0, i + 1]*c_minus*np.array([1, primitive_variables[1, i + 1], ht[0, i + 1]])
+        
+        P_2bar_plus = M_plus*(- M_L + 2)
+        P_2bar_minus = M_minus*(- M_R - 2)
+        D_plus = alpha_plus*(1 + beta_L) - beta_L*P_2bar_plus
+        D_minus = alpha_minus*(1 + beta_R) - beta_R*P_2bar_minus
+        
+        F_P_p = np.array([0, D_plus*primitive_variables[2, i], 0])
+        F_P_m = np.array([0, D_minus*primitive_variables[2, i + 1], 0])
+        
+        F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
+        
+van_leer_1st_order_flux()

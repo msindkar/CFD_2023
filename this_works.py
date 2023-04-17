@@ -17,7 +17,7 @@ const1 = (gamma - 1)/2
 const2 = gamma/(gamma - 1)
 const3 = 2/(gamma - 1)
 
-nmax = 200000 # no. of iterations
+nmax = 0 # no. of iterations
 cfl = 0.01
 kappa2 = 0.5
 kappa4 = 1/32
@@ -110,7 +110,7 @@ def compute_fluxes():
     for i in range(imax + 1):
         F[0, i] = (center_array[0, i]*center_array[1, i] + center_array[0, i + 1]*center_array[1, i + 1])/2
         F[1, i] = (center_array[0, i]*center_array[1, i]**2 + p[0, i] + center_array[0, i + 1]*center_array[1, i + 1]**2 + p[0, i + 1])/2
-        F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
+        F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)/2
         # F[0, i] = center_array[0, i]*center_array[1, i]
         # F[1, i] = center_array[0, i]*center_array[1, i]**2 + p[0, i]
         # F[2, i] = const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3
