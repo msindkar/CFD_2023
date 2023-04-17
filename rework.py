@@ -126,4 +126,17 @@ def van_leer_1st_order_flux():
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
-van_leer_1st_order_flux()
+#van_leer_1st_order_flux()
+
+# ---------- ---------- ---------- ---------- ---------- ----------
+# TRY TO REDUCE ROUND OFF ERROR
+# ---------- ---------- ---------- ---------- ---------- ----------
+
+conserved_variables = np.zeros((3, imax))
+
+def primitive_to_conserved_variables():
+    conserved_variables[0, :] = primitive_variables[0, cell_alias]
+    conserved_variables[1, :] = primitive_variables[0, cell_alias]*primitive_variables[1, cell_alias]
+    conserved_variables[2, :] = primitive_variables[2, cell_alias]/(gamma - 1) + 0.5*primitive_variables[0, cell_alias]*(primitive_variables[1, cell_alias]**2)
+    
+#primitive_to_conserved_variables()
