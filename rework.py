@@ -148,16 +148,72 @@ def conserved_to_primitive_variables():
     
 #conserved_to_primitive_variables()
 
+S = np.zeros((3, imax))
+
 def source_terms():
-    S       = np.zeros((3, imax))
     S[1, :] = primitive_variables[2, cell_alias]*dA_dx
     
 #source_terms()
 
 dt = np.zeros((1, imax))
+lambda_max = np.zeros((1, imax))
 
 def compute_time_step():
-    lambda_max = np.abs(primitive_variables[1, cell_alias]) + a[0, cell_alias]
+    lambda_max[0, :] = np.abs(primitive_variables[1, cell_alias]) + a[0, cell_alias]
     dt = cfl*(dx/lambda_max)
     
 #compute_time_step()
+
+# def write_to_file():
+#     f.write('zone T="' + str(j) + '"\n')
+#     f.write('I=' + str(imax) + '\n')
+#     f.write('DATAPACKING=POINT\n')
+#     f.write('DT=(DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE)\n')
+#     for g in range(imax):
+#         f.write(str(float(x_cell[g]))  + " " +  str(float(A_cell[g]))  + " " +  str(float(M[0, g]))  + " " +  str(float(primitive_variables[0, g]))  + " " +  str(float(primitive_variables[1, g]))  + " " +  str(float(primitive_variables[2, g]))  + " " +  str(float(T[0, g])) + '\n')
+#     # ---------- ---------- ---------- ---------- ---------- ----------
+#     # FIX INDEXING HERE
+#     # ---------- ---------- ---------- ---------- ---------- ----------
+
+
+init_norm = np.zeros((3, 1))
+R_i = np.zeros((3, imax))
+norm = np.zeros((3, 1))
+res = np.zeros((3, 1))
+
+for i in range(imax):
+    R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
+    
+init_norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
+init_norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
+init_norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
+
+j = 0
+
+def check_iterative_convergence():
+    for i in range(imax):
+        R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
+    
+    norm[0] = ((np.sum(R_i[0, :]**2))/imax)**0.5 # continuity
+    norm[1] = ((np.sum(R_i[1, :]**2))/imax)**0.5 # x-momentum
+    norm[2] = ((np.sum(R_i[2, :]**2))/imax)**0.5 # energy
+    
+    res[0] = norm[0]/init_norm[0]
+    res[1] = norm[1]/init_norm[1]
+    res[2] = norm[2]/init_norm[2]
+    
+    # if j%100 == 0:
+    #     f1.write(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + '\n')
+    
+    print(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])))  
+    
+# print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
+
+# f = open('soln.dat', 'a')
+# f.write('TITLE = "Quasi-1D Nozzle Solution"\n')
+# f.write('variables="x(m)""Area(m^2)""Mach""rho(kg/m^3)""u(m/s)""T(K)""Press(N/m^2)"\n')
+
+# f1 = open('res.dat', 'a')
+# f1.write('TITLE = "Quasi-1D Nozzle Residuals"\n')
+# f1.write('variables="Iteration""Coninuity""X-momentum""Energy"\n')
+
