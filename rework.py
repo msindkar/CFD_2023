@@ -13,9 +13,9 @@ m_air = 28.96 #
 R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
-const1 = (gamma - 1)/2
-const2 = gamma/(gamma - 1)
-const3 = 2/(gamma - 1)
+# const1 = (gamma - 1)/2
+# const2 = gamma/(gamma - 1)
+# const3 = 2/(gamma - 1)
 
 nmax = 200000 # no. of iterations
 cfl = 0.01
@@ -48,8 +48,20 @@ else:
     
 # ---------- Set inital conditions ----------
 
-center_array = np.zeros((3, imax + 2))    # Array of cell centers, even number, 2 ghost cells
+primitive_variables = np.zeros((3, imax + 2))    # Array of cell centers, even number, 2 ghost cells, rho u P
 cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easier indexing
-intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
-
+#intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
 M = np.zeros((1, imax + 2))
+T = np.zeros((1, imax + 2))
+a = np.zeros((1, imax + 2))
+
+M[0, cell_alias] = x_cell*1.4 + 1.6
+
+psi = 1 + ((gamma - 1)/2)*M[0, cell_alias]**2
+T[0, cell_alias] = t0/psi
+primitive_variables[2, cell_alias] = p0/(psi**(gamma/(gamma - 1)))
+primitive_variables[0, cell_alias] = primitive_variables[2, cell_alias]/(R_air*T[:, cell_alias])
+a[0, cell_alias] = (gamma*R_air*T[0, cell_alias])**(0.5)
+primitive_variables[1, cell_alias] = M[0, cell_alias]*a[0, cell_alias]
+
+# ---------- ---------- ----------
