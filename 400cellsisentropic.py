@@ -120,27 +120,15 @@ S       = np.zeros((3, imax))
 S[1, :] = p[0, cell_alias]*dA_dx
 # -----------
 
-# U = np.zeros((3, imax + 2))
+U = np.zeros((3, imax + 2))
 
-# U[0, :] = center_array[0, :]                    # rho
-# U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
-# U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
-
-U = np.zeros((3, imax))
-
-U[0, :] = center_array[0, cell_alias]                    # rho
-U[1, :] = center_array[0, cell_alias]*center_array[1, cell_alias] # rho*u
-U[2, :] = p[0, cell_alias]/(gamma - 1) + 0.5*center_array[0, cell_alias]*center_array[1, cell_alias]**2
+U[0, :] = center_array[0, :]                    # rho
+U[1, :] = center_array[0, :]*center_array[1, :] # rho*u
+U[2, :] = p[0, :]/(gamma - 1) + 0.5*center_array[0, :]*center_array[1, :]**2
 
 def compute_primitive_variables():
-    # center_array[0, cell_alias] = U[0, cell_alias]
-    # center_array[1, cell_alias] = U[1, cell_alias]/center_array[0, cell_alias]
-    # p[0, cell_alias] = p0*(center_array[0, cell_alias]/rho0)**gamma
-    # M[0, cell_alias] = center_array[1, cell_alias]/np.sqrt(gamma*p[0, cell_alias]/center_array[0, cell_alias])
-    # center_array[2, :] = t0/(1 + const1*M[0, :]**2)
-    
-    center_array[0, cell_alias] = U[0, :]
-    center_array[1, cell_alias] = U[1, :]/center_array[0, cell_alias]
+    center_array[0, cell_alias] = U[0, cell_alias]
+    center_array[1, cell_alias] = U[1, cell_alias]/center_array[0, cell_alias]
     p[0, cell_alias] = p0*(center_array[0, cell_alias]/rho0)**gamma
     M[0, cell_alias] = center_array[1, cell_alias]/np.sqrt(gamma*p[0, cell_alias]/center_array[0, cell_alias])
     center_array[2, :] = t0/(1 + const1*M[0, :]**2)
@@ -151,20 +139,10 @@ def compute_fluxes():
     for i in range(imax + 1):
         F[0, i] = (center_array[0, i]*center_array[1, i] + center_array[0, i + 1]*center_array[1, i + 1])/2
         F[1, i] = (center_array[0, i]*center_array[1, i]**2 + p[0, i] + center_array[0, i + 1]*center_array[1, i + 1]**2 + p[0, i + 1])/2
-        F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)/2
-    # for i in range(1, imax):
-    #     F[0, i] = (U[1, i - 1] + U[1, i])/2
-    #     F[1, i] = ((U[1, i - 1]**2)/U[0, i - 1] + p[0, i] + (U[1, i]**2)/U[0, i] + p[0, i + 1])/2
-    #     F[2, i] = ((U[1, i - 1]/U[0, i - 1])*U[2, i - 1] + 1 + (U[1, i]/U[0, i])*U[2, i] + 1)/2
-        
-    # F[0, 0] = (center_array[0, 0]*center_array[1, 0] + center_array[0, 1]*center_array[1, 1])/2
-    # F[1, 0] = (center_array[0, 0]*center_array[1, 0]**2 + p[0, 0] + center_array[0, 1]*center_array[1, 1]**2 + p[0, 1])/2
-    # F[2, 0] = (const2*p[0, 0]*center_array[1, 0] + 0.5*center_array[0, 0]*center_array[1, 0]**3 + const2*p[0, 1]*center_array[1, 1] + 0.5*center_array[0, 1]*center_array[1, 1]**3)  
-    
-    # F[0, imax] = (center_array[0, imax]*center_array[1, imax] + center_array[0, imax + 1]*center_array[1, imax + 1])/2
-    # F[1, imax] = (center_array[0, imax]*center_array[1, imax]**2 + p[0, imax] + center_array[0, imax + 1]*center_array[1, imax + 1]**2 + p[0, imax + 1])/2
-    # F[2, imax] = (const2*p[0, imax]*center_array[1, imax] + 0.5*center_array[0, imax]*center_array[1, imax]**3 + const2*p[0, imax + 1]*center_array[1, imax + 1] + 0.5*center_array[0, imax + 1]*center_array[1, imax + 1]**3)  
-    
+        F[2, i] = (const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3 + const2*p[0, i + 1]*center_array[1, i + 1] + 0.5*center_array[0, i + 1]*center_array[1, i + 1]**3)
+        # F[0, i] = center_array[0, i]*center_array[1, i]
+        # F[1, i] = center_array[0, i]*center_array[1, i]**2 + p[0, i]
+        # F[2, i] = const2*p[0, i]*center_array[1, i] + 0.5*center_array[0, i]*center_array[1, i]**3
 compute_fluxes()
 
 D              = np.zeros((3, imax + 1))
@@ -200,28 +178,6 @@ def compute_dissipation():
     # p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
     # p_extrapolated[0, imax + 3]   = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
     
-    # for i in range(imax + 2):
-    #     # nu[0, i] = abs((p_extrapolated[0, i + 2] - 2*p_extrapolated[0, i + 1] + p[0, i])/(p_extrapolated[0, i + 2] + 2*p_extrapolated[0, i + 1] + p_extrapolated[0, i]))
-    #     nu[0, i] = abs((p_extrapolated[i + 2] - 2*p_extrapolated[i + 1] + p[0, i])/(p_extrapolated[i + 2] + 2*p_extrapolated[i + 1] + p_extrapolated[i]))
-    
-    # epsilon2[0, 0]    = kappa2*max(nu[0, 0], nu[0, 1], nu[0, 2])
-    # epsilon2[0, imax] = kappa2*max(nu[0, imax - 1], nu[0, imax], nu[0, imax + 1])
-    
-    # for i in range(1, imax):
-    #     epsilon2[0, i] = kappa2*max(nu[0, i - 1], nu[0, i], nu[0, i + 1], nu[0, i + 2])
-        
-    # epsilon4[0, :] = np.maximum((kappa4 - epsilon2), np.zeros((1, imax + 1)))
-    
-    # for i in range(imax + 1):
-    #     D2[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon2[0, i]*(U[:, i + 1] - U[:, i])
-    
-    # for i in range(1, imax - 1):
-    #     D4[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon4[0, i]*(U[:, i + 2] - 3*U[:, i + 1] + 3*U[:, i] - U[:, i - 1])
-    
-    # D4[:, 0]        = 2*D4[:, 1] - D4[:, 1] # <-------------------------------- MISTAKE HERE?
-    # D4[:, imax - 1] = 2*D4[:, imax - 2] - D4[:, imax - 3]
-    # D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]
-    
     for i in range(imax + 2):
         # nu[0, i] = abs((p_extrapolated[0, i + 2] - 2*p_extrapolated[0, i + 1] + p[0, i])/(p_extrapolated[0, i + 2] + 2*p_extrapolated[0, i + 1] + p_extrapolated[0, i]))
         nu[0, i] = abs((p_extrapolated[i + 2] - 2*p_extrapolated[i + 1] + p[0, i])/(p_extrapolated[i + 2] + 2*p_extrapolated[i + 1] + p_extrapolated[i]))
@@ -234,24 +190,15 @@ def compute_dissipation():
         
     epsilon4[0, :] = np.maximum((kappa4 - epsilon2), np.zeros((1, imax + 1)))
     
-    for i in range(1, imax):
-        D2[:, i] = ((lambda_max[i - 1] + lambda_max[i])/2)*epsilon2[0, i]*(U[:, i] - U[:, i - 1])
+    for i in range(imax + 1):
+        D2[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon2[0, i]*(U[:, i + 1] - U[:, i])
     
-    for i in range(2, imax - 1):
-        D4[:, i] = ((lambda_max[i - 1] + lambda_max[i])/2)*epsilon4[0, i]*(U[:, i + 1] - 3*U[:, i] + 3*U[:, i - 1] - U[:, i - 2])
+    for i in range(1, imax - 1):
+        D4[:, i] = ((lambda_max[i] + lambda_max[i + 1])/2)*epsilon4[0, i]*(U[:, i + 2] - 3*U[:, i + 1] + 3*U[:, i] - U[:, i - 1])
     
-    D2[:, 0] = 2*D2[:, 1] - D2[:, 2]
-    D2[:, imax] = 2*D2[:, imax - 1] - D2[:, imax - 2]
-    
-    D4[:, 1] = 2*D4[:, 2] - D4[:, 3]
+    D4[:, 0]        = 2*D4[:, 1] - D4[:, 1]
     D4[:, imax - 1] = 2*D4[:, imax - 2] - D4[:, imax - 3]
-    
-    D4[:, 0] = 2*D4[:, 1] - D4[:, 2]
-    D4[:, imax] = 2*D4[:, imax - 1] - D4[:, imax - 2]
-    
-    # D4[:, 0]        = 2*D4[:, 1] - D4[:, 2] # <-------------------------------- FIXED MISTAKE HERE?
-    # D4[:, imax - 1] = 2*D4[:, imax - 2] - D4[:, imax - 3]
-    # D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]
+    D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]
 
 D = -(D2 - D4)
 
@@ -342,8 +289,7 @@ for j in range(nmax + 1):
     S[1, :] = p[0, cell_alias]*dA_dx
     for i in range(imax):
         R_i[:, i] = (F[:, i + 1] + D[:, i + 1])*A_intf[i + 1] - (F[:, i] + D[:, i])*A_intf[i] - S[:, i]*dx
-    # U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
-    U[:, :] = U[:, :] - (dt/V)*R_i
+    U[:, cell_alias] = U[:, cell_alias] - (dt/V)*R_i
     compute_primitive_variables()
     #try_boundary_conditions()
     set_boundary_conditions()
