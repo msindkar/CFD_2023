@@ -101,15 +101,8 @@ def try_boundary_conditions():
     p[0, imax + 1]            = p0/psi2**const2                                                    # Set initial pressure
     center_array[0, imax + 1] = p[0, imax + 1]/(R_air*center_array[2, imax + 1])
     
-    # if M[0, 0] < 0.11668889438289902/100:
-    #     M[0, 0] = 0.11668889438289902/100
-    # if center_array[1, 0] < 57.2706378650403/100:
-    #     center_array[1, 0] = 57.2706378650403/100
-    
-    # if M[0, imax + 1] < 0.11668889438289902/100:
-    #     M[0, imax + 1] = 0.11668889438289902/100
-    # if center_array[1, imax + 1] < 57.2706378650403/100:
-    #     center_array[1, imax + 1] = 57.2706378650403/100
+    M[0, :][M[0, :] < 0.11668889438289902/100] = 0.11668889438289902/100
+    center_array[1, :][center_array[1, :] < 57.2706378650403/100] = 57.2706378650403/100
 
 #try_boundary_conditions()
 
@@ -163,17 +156,6 @@ def compute_dissipation():
     
     p_extrapolated = p0/(1 + const1*M_extrapolated[0, :]**2)**const2
     
-    # U[:, 0] =2*U[:, 1] - U[:, 2]
-    # U[:, imax + 1] =2*U[:, imax] - U[:, imax - 1]
-    
-    # U[0, 0] = center_array[0, 0]                    # rho
-    # U[1, 0] = center_array[0, 0]*center_array[1, 0] # rho*u
-    # U[2, 0] = p[0, 0]/(gamma - 1) + 0.5*center_array[0, 0]*center_array[1, 0]**2
-    
-    # U[0, imax + 1] = center_array[0, imax + 1]                    # rho
-    # U[1, imax + 1] = center_array[0, imax + 1]*center_array[1, imax + 1] # rho*u
-    # U[2, imax + 1] = p[0, imax + 1]/(gamma - 1) + 0.5*center_array[0, imax + 1]*center_array[1, imax + 1]**2
-    
     # p_extrapolated[0, 1:imax + 3] = p[0, :]
     # p_extrapolated[0, 0]          = 2*p_extrapolated[0, 1] - p_extrapolated[0, 2]
     # p_extrapolated[0, imax + 3]   = 2*p_extrapolated[0, imax + 2]  - p_extrapolated[0, imax + 1]
@@ -201,10 +183,6 @@ def compute_dissipation():
     D4[:, imax]     = 2*D4[:, imax - 1] - D4[:, imax - 2]
 
 D = -(D2 - D4)
-
-# TRY NO U GHOST CELLS
-
-
 
 # ---------- Calculate residual (L2) ----------
 
