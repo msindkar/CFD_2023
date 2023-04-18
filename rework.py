@@ -13,8 +13,8 @@ m_air = 28.96 #
 R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
-nmax = 10000 # no. of iterations
-cfl = 0.5
+nmax = 50000 # no. of iterations
+cfl = 0.7
 
 # ---------- Set geometry ----------
 
@@ -201,8 +201,24 @@ def out_steady_state_iterative_residuals():
     
     if j%100 == 0:
         f1.write(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + '\n')
-        print(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])))  
-    # print(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])))  
+        print(str(j) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])))
+        
+def de_norms():
+    DE = np.zeros((3, imax))
+    DE_norm = np.zeros((3, 1))
+    
+    DE[0, :] = exact_solution[5, :] -  primitive_variables[0, cell_alias]
+    DE[1, :] = exact_solution[6, :] -  primitive_variables[1, cell_alias]
+    DE[2, :] = exact_solution[4, :] -  primitive_variables[2, cell_alias]
+    
+    DE_norm[0] = ((np.sum(DE[0, :]**2))/imax)**0.5
+    DE_norm[1] = ((np.sum(DE[1, :]**2))/imax)**0.5
+    DE_norm[2] = ((np.sum(DE[2, :]**2))/imax)**0.5
+
+    f3 = open('DE_norms.txt', 'w')
+    print('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'P = ' + str(float(DE_norm[2])))
+    f3.write('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'P = ' + str(float(DE_norm[2])))
+    f3.close()
 
 print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
 
@@ -223,5 +239,7 @@ for j in range(nmax + 1):
         write_to_file()
         break
     
+if shock_flag == 0:
+    de_norms()
 f.close()
 f1.close()
