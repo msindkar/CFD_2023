@@ -6,7 +6,7 @@ from hw_1_func import supersonic_nozzle_exact_solution
 
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
-rho0 = 1.7416406062063983 # Stagnation density, kg/m3 (calculated, check maybe?)
+#rho0 = 1.7416406062063983 # Stagnation density, kg/m3 (calculated, check maybe?)
 gamma = 1.4
 R = 8314    # J/(kmol*K)
 m_air = 28.96 # 
@@ -17,10 +17,10 @@ pback = 1.2E5
 # const2 = gamma/(gamma - 1)
 # const3 = 2/(gamma - 1)
 
-nmax = 100000 # no. of iterations
+nmax = 10000 # no. of iterations
 cfl = 0.5
-kappa2 = 0.5
-kappa4 = 1/32
+# kappa2 = 0.5
+# kappa4 = 1/32
 # ---------- Set geometry ----------
 
 print('Enter number of cells (even number):')
@@ -77,9 +77,9 @@ def upwind_boundary_conditions():
     psi_bc_0 = 1 + ((gamma - 1)/2)*M[0, 0]**2
     T[0, 0] = t0/psi_bc_0
     primitive_variables[2, 0] = p0/(psi_bc_0**(gamma/(gamma - 1)))
-    primitive_variables[0, 0] = primitive_variables[2, 0]/(R_air*T[:, 0])
-    a[0, 0] = (gamma*R_air*T[0, 0])**(0.5)
-    primitive_variables[1, 0] = M[0, 0]*a[0, 0]\
+    primitive_variables[0, 0] = primitive_variables[2, 0]/(R_air*T[0, 0])
+    a[0, 0] = (gamma*R_air*T[0, 0])**(1/2)
+    primitive_variables[1, 0] = M[0, 0]*a[0, 0]
     
     ht[0, 0] = ((gamma*R_air)/(gamma - 1))*T[0, 0] + (primitive_variables[1, 0]**2)/2
     et[0, 0] = ht[0, 0] - (primitive_variables[2, 0]/primitive_variables[0, 0])
@@ -90,7 +90,7 @@ def upwind_boundary_conditions():
     T[0, imax + 1] = t0/psi_bc_1
     primitive_variables[2, imax + 1] = p0/(psi_bc_1**(gamma/(gamma - 1)))
     primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
-    a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(0.5)
+    a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(1/2)
     primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
     
     ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
@@ -100,6 +100,21 @@ def upwind_boundary_conditions():
     # if M[0, imax + 1] < 0.11668889438289902/100: M[0, imax + 1] = 0.11668889438289902/100
 
 upwind_boundary_conditions()
+
+def try_bc():
+    M[0, 0] = 2*M[0, 1] - M[0, 2]
+    primitive_variables[:, 0] = 2*primitive_variables[:, 1] - primitive_variables[:, 2]
+    T[0, 0] = 2*T[0, 1] - T[0, 2]
+    a[0, 0] = (gamma*R_air*T[0, 0])**(1/2)
+    ht[0, 0] = ((gamma*R_air)/(gamma - 1))*T[0, 0] + (primitive_variables[1, 0]**2)/2
+    
+    M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]
+    primitive_variables[:, imax + 1] = 2*primitive_variables[:, imax] - primitive_variables[:, imax - 1]
+    T[0, imax + 1] = 2*T[0, imax] - T[0, imax - 1]
+    a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(0.5)
+    ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
+    
+#try_bc()
 
 F = np.zeros((3, imax + 1))
 
@@ -148,14 +163,19 @@ def conserved_to_primitive_variables():
     primitive_variables[0, cell_alias] = conserved_variables[0, :]
     primitive_variables[1, cell_alias] = conserved_variables[1, :]/conserved_variables[0, :]
     primitive_variables[2, cell_alias] = (gamma - 1)*conserved_variables[2, :] - 0.5*(gamma - 1)*(conserved_variables[1, :]**2)/(conserved_variables[0, :])
-    a[0, cell_alias] = (gamma*primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])**0.5
-    M[0, cell_alias] = np.abs(primitive_variables[1, cell_alias])/a[0, cell_alias]
-    psi = 1 + ((gamma - 1)/2)*M[0, cell_alias]**2
-    T[0, cell_alias] = t0/psi
+
+def update_domain_variables():
+    # a[0, cell_alias] = (gamma*primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])**0.5
+    # M[0, cell_alias] = np.abs(primitive_variables[1, cell_alias])/a[0, cell_alias]
+    # psi = 1 + ((gamma - 1)/2)*M[0, cell_alias]**2
+    # T[0, cell_alias] = t0/psi
+    T[0, cell_alias] = primitive_variables[2, cell_alias]/(R_air*primitive_variables[0, cell_alias])
+    a[0, cell_alias] = (gamma*R_air*T[0, cell_alias])**(1/2)
+    M[0, cell_alias] = primitive_variables[1, cell_alias]/a[0, cell_alias]
     ht[0, cell_alias] = ((gamma*R_air)/(gamma - 1))*T[0, cell_alias] + (primitive_variables[1, cell_alias]**2)/2
     et[0, cell_alias] = ht[0, cell_alias] - (primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])
-    
-conserved_to_primitive_variables()
+      
+#conserved_to_primitive_variables()
 
 S = np.zeros((3, imax))
 
@@ -225,14 +245,18 @@ def check_iterative_convergence():
 #U_old = np.zeros((3, imax))
 
 for j in range(nmax + 1):
+    # update_domain_variables()
+    # try_bc()
     upwind_boundary_conditions()
     van_leer_1st_order_flux()
     compute_time_step()
     source_terms()
-    #primitive_to_conserved_variables()
+    primitive_to_conserved_variables()
     #U_old = 
     for i in range(imax):
         R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
     conserved_variables = conserved_variables - R_i*(dt/V)
     conserved_to_primitive_variables()
+    #try_bc()
+    update_domain_variables()
     check_iterative_convergence()
