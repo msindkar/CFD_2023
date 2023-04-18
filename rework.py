@@ -14,7 +14,7 @@ R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
 nmax = 50000 # no. of iterations
-cfl = 0.7
+cfl = 0.8
 
 # ---------- Set geometry ----------
 
@@ -120,7 +120,55 @@ def van_leer_1st_order_flux():
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
-van_leer_1st_order_flux()
+#van_leer_1st_order_flux()
+
+# roe_rho = np.zeros((1, imax + 1))
+# roe_u   = np.zeros((1, imax + 1))
+# roe_ht  = np.zeros((1, imax + 1))
+# roe_a2  = np.zeros((1, imax + 1))
+
+lam     = np.zeros((1, 3))
+# lam_p   = np.zeros((1, 3))
+# lam_m   = np.zeros((1, 3))
+r_eig   = np.zeros((3, 3))
+d_w     = np.zeros((1, 3))
+# sigma   = np.zeros((3, 1))
+fi      = np.zeros((3, 1))
+fi1     = np.zeros((3, 1))
+
+def roe_1st_order_flux():
+    for i in range(imax + 1):
+        roe_R   = (primitive_variables[0, i + 1]/primitive_variables[0, i])**(1/2)
+        roe_rho = roe_R*primitive_variables[0, i]
+        roe_u   = (roe_R*primitive_variables[1, i + 1] + primitive_variables[1, i])/(roe_R + 1)
+        roe_ht  = (roe_R*ht[0, i + 1] + ht[0, i])/(roe_R + 1)
+        roe_a2  = (gamma - 1)*(roe_ht - (roe_u**2)/2)
+        k = 0
+        lam[0, 0]     = roe_u
+        lam[0, 1]     = roe_u + (roe_a2)**(0.5)
+        lam[0, 2]     = roe_u - (roe_a2)**(0.5)
+        lam_p   = np.zeros((1, 3))
+        lam_m   = np.zeros((1, 3))
+        for o in lam[0, :]<0:
+            if o:
+                lam_m[0, k] = lam[0, k]
+            else:
+                lam_p[0, k] = lam[0, k]
+            k+=1
+        r_eig[:, 0] = np.array([1, roe_u, (roe_u**2)/2]).transpose()
+        r_eig[:, 1] =  (roe_rho/(2*(roe_a2**0.5)))*np.array([1, roe_u + (roe_a2)**(0.5), roe_ht + roe_u*(roe_a2)**(0.5)])
+        r_eig[:, 2] = -(roe_rho/(2*(roe_a2**0.5)))*np.array([1, roe_u - (roe_a2)**(0.5), roe_ht - roe_u*(roe_a2)**(0.5)])
+        d_w  [0, 0] = (primitive_variables[0, i + 1] - primitive_variables[0, i]) - (primitive_variables[2, i + 1] - primitive_variables[2, i])/roe_a2
+        d_w  [0, 1] = (primitive_variables[1, i + 1] - primitive_variables[1, i]) + (primitive_variables[2, i + 1] - primitive_variables[2, i])/(roe_rho*(roe_a2**0.5))
+        d_w  [0, 2] = (primitive_variables[1, i + 1] - primitive_variables[1, i]) - (primitive_variables[2, i + 1] - primitive_variables[2, i])/(roe_rho*(roe_a2**0.5))
+        fi[:, 0]    = np.array([primitive_variables[0, i]*primitive_variables[1, i], primitive_variables[0, i]*primitive_variables[1, i]**2 + primitive_variables[2, i], primitive_variables[0, i]*primitive_variables[1, i]*ht[0, i]])
+        fi1[:, 0]   = np.array([primitive_variables[0, i + 1]*primitive_variables[1, i + 1], primitive_variables[0, i + 1]*primitive_variables[1, i + 1]**2 + primitive_variables[2, i + 1], primitive_variables[0, i + 1]*primitive_variables[1, i + 1]*ht[0, i + 1]])
+        sigma   = np.zeros((3, 1))
+        for q in range(3):
+            sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
+        F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
+
+roe_1st_order_flux()
 
 # ---------- ---------- ---------- ---------- ---------- ----------
 # TRY TO REDUCE ROUND OFF ERROR
@@ -239,7 +287,8 @@ print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
 
 for j in range(nmax + 1):
     upwind_boundary_conditions()
-    van_leer_1st_order_flux()
+    # van_leer_1st_order_flux()
+    roe_1st_order_flux()
     compute_time_step()
     source_terms()
     primitive_to_conserved_variables()
