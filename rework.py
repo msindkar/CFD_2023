@@ -50,7 +50,6 @@ M = np.zeros((1, imax + 2))
 T = np.zeros((1, imax + 2))
 a = np.zeros((1, imax + 2))
 ht = np.zeros((1, imax + 2))
-et = np.zeros((1, imax + 2))
 
 M[0, cell_alias] = x_cell*1.4 + 1.6
 
@@ -81,7 +80,10 @@ def upwind_boundary_conditions():
     
     psi_bc_1 = 1 + ((gamma - 1)/2)*M[0, imax + 1]**2
     T[0, imax + 1] = t0/psi_bc_1
-    primitive_variables[2, imax + 1] = p0/(psi_bc_1**(gamma/(gamma - 1)))
+    if shock_flag == 0:
+        primitive_variables[2, imax + 1] = p0/(psi_bc_1**(gamma/(gamma - 1)))
+    else:
+        primitive_variables[2, imax + 1] = 2*pback - primitive_variables[2, imax]
     primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
     a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(1/2)
     primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
@@ -143,7 +145,6 @@ def update_domain_variables():
     a[0, cell_alias] = (gamma*R_air*T[0, cell_alias])**(1/2)
     M[0, cell_alias] = primitive_variables[1, cell_alias]/a[0, cell_alias]
     ht[0, cell_alias] = ((gamma*R_air)/(gamma - 1))*T[0, cell_alias] + (primitive_variables[1, cell_alias]**2)/2
-    et[0, cell_alias] = ht[0, cell_alias] - (primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])
 
 S = np.zeros((3, imax))
 
@@ -176,6 +177,20 @@ def write_to_file():
     f.write('DT=(DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE)\n')
     for g in range(imax):
         f.write(str(float(x_cell[g]))  + " " +  str(float(A_cell[g]))  + " " +  str(float(M[0, g + 1]))  + " " +  str(float(primitive_variables[0, g + 1]))  + " " +  str(float(primitive_variables[1, g + 1]))  + " " +  str(float(primitive_variables[2, g + 1]))  + " " +  str(float(T[0, g + 1])) + '\n')
+    print('Wrote converged')
+    
+def write_exact():
+    f4 = open('exact.dat', 'w')
+    f4.write('TITLE = "Quasi-1D Nozzle Exact Solution"\n')
+    f4.write('variables="x(m)""Area(m^2)""Mach""rho(kg/m^3)""u(m/s)""Press(N/m^2)""T(K)"\n')
+    f4.write('zone T="' + str(j) + '"\n')
+    f4.write('I=' + str(imax) + '\n')
+    f4.write('DATAPACKING=POINT\n')
+    f4.write('DT=(DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE DOUBLE)\n')
+    for g in range(imax):
+        f4.write(str(float(exact_solution[0, :][g]))  + " " +  str(float(exact_solution[1, :][g]))  + " " +  str(float(exact_solution[2, :][g]))  + " " +  str(float(exact_solution[5, :][g]))  + " " +  str(float(exact_solution[6, :][g]))  + " " +  str(float(exact_solution[4, :][g]))  + " " +  str(float(exact_solution[3, :][g])) + '\n')
+    f4.close()
+    print('Wrote exact')
 
 init_norm = np.zeros((3, 1))
 R_i = np.zeros((3, imax))
@@ -234,12 +249,13 @@ for j in range(nmax + 1):
     conserved_to_primitive_variables()
     update_domain_variables()
     out_steady_state_iterative_residuals()
-    if (res[:, :] <= 1E-12).any():
+    if (res[:, :] <= 1E-12).all():
         print('Solution converged in ' + str(j) + ' iterations')
         write_to_file()
         break
     
 if shock_flag == 0:
     de_norms()
+    write_exact()
 f.close()
 f1.close()
