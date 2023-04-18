@@ -17,8 +17,8 @@ pback = 1.2E5
 # const2 = gamma/(gamma - 1)
 # const3 = 2/(gamma - 1)
 
-nmax = 10000 # no. of iterations
-cfl = 0.1
+nmax = 100000 # no. of iterations
+cfl = 0.5
 kappa2 = 0.5
 kappa4 = 1/32
 # ---------- Set geometry ----------
@@ -95,6 +95,9 @@ def upwind_boundary_conditions():
     
     ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
     et[0, imax + 1] = ht[0, imax + 1] - (primitive_variables[2, imax + 1]/primitive_variables[0, imax + 1])
+    
+    # if M[0, 0] < 0.11668889438289902/100: M[0,0] = 0.11668889438289902/100
+    # if M[0, imax + 1] < 0.11668889438289902/100: M[0, imax + 1] = 0.11668889438289902/100
 
 upwind_boundary_conditions()
 
@@ -145,6 +148,12 @@ def conserved_to_primitive_variables():
     primitive_variables[0, cell_alias] = conserved_variables[0, :]
     primitive_variables[1, cell_alias] = conserved_variables[1, :]/conserved_variables[0, :]
     primitive_variables[2, cell_alias] = (gamma - 1)*conserved_variables[2, :] - 0.5*(gamma - 1)*(conserved_variables[1, :]**2)/(conserved_variables[0, :])
+    a[0, cell_alias] = (gamma*primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])**0.5
+    M[0, cell_alias] = np.abs(primitive_variables[1, cell_alias])/a[0, cell_alias]
+    psi = 1 + ((gamma - 1)/2)*M[0, cell_alias]**2
+    T[0, cell_alias] = t0/psi
+    ht[0, cell_alias] = ((gamma*R_air)/(gamma - 1))*T[0, cell_alias] + (primitive_variables[1, cell_alias]**2)/2
+    et[0, cell_alias] = ht[0, cell_alias] - (primitive_variables[2, cell_alias]/primitive_variables[0, cell_alias])
     
 conserved_to_primitive_variables()
 
@@ -220,7 +229,7 @@ for j in range(nmax + 1):
     van_leer_1st_order_flux()
     compute_time_step()
     source_terms()
-    primitive_to_conserved_variables()
+    #primitive_to_conserved_variables()
     #U_old = 
     for i in range(imax):
         R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
