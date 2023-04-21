@@ -228,73 +228,101 @@ def extrapolate_for_2nd_order():
 r_plus = np.zeros(5)
 r_minus = np.zeros(5)
 r_den = np.zeros(5)
-psi_plus = np.zeros(5)
-psi_minus = np.zeros(5)
+psi_plus = np.zeros((5, imax + 1))
+psi_minus = np.zeros((5, imax + 1))
 
-def van_leer_limiter(f_iter):
-    if f_iter == 0:
-        r_den[[0, 1, 2]] = primitive_variables[:, 1] - primitive_variables[:, 0]
-        r_den[[3]] = T[0, 1] - T[0, 0]
-        r_den[[4]] = a[0, 1] - a[0, 0]
-        for i in range(0, 5):
-            if abs(r_den[i]) < 1E-6:
-                r_den[i] = np.sign(r_den[i])*1E-6
-        r_plus[[0, 1, 2]] = (primitive_variables[:, 2] - primitive_variables[:, 1])/r_den[[0, 1, 2]]
-        r_plus[3] = (T[0, 2] - T[0, 1])/r_den[3]
-        r_plus[4] = (a[0, 2] - a[0, 1])/r_den[4]
+def van_leer_limiter():
+    for i in range(imax + 1):
+        if i == 0:
+            r_den[[0, 1, 2]] = primitive_variables[:, 1] - primitive_variables[:, 0]
+            r_den[[3]] = T[0, 1] - T[0, 0]
+            r_den[[4]] = a[0, 1] - a[0, 0]
+            for i in range(0, 5):
+                if abs(r_den[i]) < 1E-6:
+                    r_den[i] = np.sign(r_den[i])*1E-6
+            r_plus[[0, 1, 2]] = (primitive_variables[:, 2] - primitive_variables[:, 1])/r_den[[0, 1, 2]]
+            r_plus[3] = (T[0, 2] - T[0, 1])/r_den[3]
+            r_plus[4] = (a[0, 2] - a[0, 1])/r_den[4]
+            
+            r_minus[[0, 1, 2]] = (primitive_variables[:, 0] - primitive_variables_e[:, 0])/r_den[[0, 1, 2]]
+            r_minus[3] = (T[0, 0] - T_e[0, 0])/r_den[3]
+            r_minus[4] = (a[0, 0] - a_e[0, 0])/r_den[4]
+            
+            # ---------- ---------- ---------- ---------- ---------- ----------
+            # CHECK r-?
+            # ---------- ---------- ---------- ---------- ---------- ----------
+            
+        elif i == imax:
+            r_den[[0, 1, 2]] = primitive_variables[:, imax + 1] - primitive_variables[:, imax]
+            r_den[[3]] = T[0, imax + 1] - T[0, imax]
+            r_den[[4]] = a[0, imax + 1] - a[0, imax]
+            for i in range(0, 5):
+                if abs(r_den[i]) < 1E-6:
+                    r_den[i] = np.sign(r_den[i])*1E-6
+            r_plus[[0, 1, 2]] = (primitive_variables_e[:, 1] - primitive_variables[:, imax + 1])/r_den[[0, 1, 2]]
+            r_plus[3] = (T_e[0, 1] - T[0, imax + 1])/r_den[3]
+            r_plus[4] = (a_e[0, 1] - a[0, imax + 1])/r_den[4]
+            
+            r_minus[[0, 1, 2]] = (primitive_variables[:, imax] - primitive_variables[:, imax - 1])/r_den[[0, 1, 2]]
+            r_minus[3] = (T[0, imax] - T[0, imax - 1])/r_den[3]
+            r_minus[4] = (a[0, imax] - a[0, imax - 1])/r_den[4]
+            
+        else:
+            r_den[[0, 1, 2]] = primitive_variables[:, i + 1] - primitive_variables[:, i]
+            r_den[[3]] = T[0, i + 1] - T[0, i]
+            r_den[[4]] = a[0, i + 1] - a[0, i]
+            for i in range(0, 5):
+                if abs(r_den[i]) < 1E-6:
+                    r_den[i] = np.sign(r_den[i])*1E-6
+            r_plus[[0, 1, 2]] = (primitive_variables[:, i + 2] - primitive_variables[:, i + 1])/r_den[[0, 1, 2]]
+            r_plus[3] = (T[0, i + 2] - T[0, i + 1])/r_den[3]
+            r_plus[4] = (a[0, i + 2] - a[0, i + 1])/r_den[4]
+            
+            r_minus[[0, 1, 2]] = (primitive_variables[:, i] - primitive_variables[:, i - 1])/r_den[[0, 1, 2]]
+            r_minus[3] = (T[0, i] - T[0, i - 1])/r_den[3]
+            r_minus[4] = (a[0, i] - a[0, i - 1])/r_den[4]
         
-        r_minus[[0, 1, 2]] = (primitive_variables[:, 0] - primitive_variables_e[:, 0])/r_den[[0, 1, 2]]
-        r_minus[3] = (T[0, 0] - T_e[0, 0])/r_den[3]
-        r_minus[4] = (a[0, 0] - a_e[0, 0])/r_den[4]
-        
-        # ---------- ---------- ---------- ---------- ---------- ----------
-        # CHECK r-?
-        # ---------- ---------- ---------- ---------- ---------- ----------
-        
-    elif f_iter == imax:
-        r_den[[0, 1, 2]] = primitive_variables[:, imax + 1] - primitive_variables[:, imax]
-        r_den[[3]] = T[0, imax + 1] - T[0, imax]
-        r_den[[4]] = a[0, imax + 1] - a[0, imax]
-        for i in range(0, 5):
-            if abs(r_den[i]) < 1E-6:
-                r_den[i] = np.sign(r_den[i])*1E-6
-        r_plus[[0, 1, 2]] = (primitive_variables_e[:, 1] - primitive_variables[:, imax + 1])/r_den[[0, 1, 2]]
-        r_plus[3] = (T_e[0, 1] - T[0, imax + 1])/r_den[3]
-        r_plus[4] = (a_e[0, 1] - a[0, imax + 1])/r_den[4]
-        
-        r_minus[[0, 1, 2]] = (primitive_variables[:, imax] - primitive_variables[:, imax - 1])/r_den[[0, 1, 2]]
-        r_minus[3] = (T[0, imax] - T[0, imax - 1])/r_den[3]
-        r_minus[4] = (a[0, imax] - a[0, imax - 1])/r_den[4]
-        
-    else:
-        r_den[[0, 1, 2]] = primitive_variables[:, f_iter + 1] - primitive_variables[:, f_iter]
-        r_den[[3]] = T[0, f_iter + 1] - T[0, f_iter]
-        r_den[[4]] = a[0, f_iter + 1] - a[0, f_iter]
-        for i in range(0, 5):
-            if abs(r_den[i]) < 1E-6:
-                r_den[i] = np.sign(r_den[i])*1E-6
-        r_plus[[0, 1, 2]] = (primitive_variables[:, f_iter + 2] - primitive_variables[:, f_iter + 1])/r_den[[0, 1, 2]]
-        r_plus[3] = (T[0, f_iter + 2] - T[0, f_iter + 1])/r_den[3]
-        r_plus[4] = (a[0, f_iter + 2] - a[0, f_iter + 1])/r_den[4]
-        
-        r_minus[[0, 1, 2]] = (primitive_variables[:, f_iter] - primitive_variables[:, f_iter - 1])/r_den[[0, 1, 2]]
-        r_minus[3] = (T[0, f_iter] - T[0, f_iter - 1])/r_den[3]
-        r_minus[4] = (a[0, f_iter] - a[0, f_iter - 1])/r_den[4]
+        psi_plus[:, i] = (r_plus + np.abs(r_plus))/(1 + r_plus)
+        psi_minus[:, i] = (r_minus + np.abs(r_minus))/(1 + r_minus)
 
-    psi_plus[:] = (r_plus + np.abs(r_plus))/(1 + r_plus)
-    psi_minus[:] = (r_minus + np.abs(r_minus))/(1 + r_minus)
+prim_L = np.zeros((3, imax + 1))
+prim_R = np.zeros((3, imax + 1))
+T_L    = np.zeros((1, imax + 1))
+T_R    = np.zeros((1, imax + 1))
+a_L    = np.zeros((1, imax + 1))
+a_R    = np.zeros((1, imax + 1))
+epsilon= 0
 
-prim_L = np.zeros(3)
-prim_R = np.zeros(3)
-T_L    = 0
-T_R    = 0
-a_L    = 0
-a_R    = 0
+def compute_LR_states_2nd_order():
+    # USING 1st ORDER BOUNDAY FLUXES COZ THERE'S NO PSI FOR THE GHOST CELL L/R INTERFACE
+    for i in range(imax + 1):
+        if i == 0:
+            prim_L[:, 0] = primitive_variables[:, 0]
+            T_L[0, 0] = T[0, 0]
+            a_L[0, 0] = a[0, 0]
+            prim_R[:, 0] = primitive_variables[:, 1] - (epsilon/4)*((1 - kappa)*psi_minus[[0, 1, 2], 1]*(primitive_variables[:, 2] - primitive_variables[:, 1]) + (1 + kappa)*psi_plus[[0, 1, 2], 0]*(primitive_variables[:, 1] - primitive_variables[:, 0]))
+            T_R[:, 0] = T[:, 1] - (epsilon/4)*((1 - kappa)*psi_minus[3, 1]*(T[:, 2] - T[:, 1]) + (1 + kappa)*psi_plus[3, 0]*(T[:, 1] - T[:, 0]))
+            a_R[:, 0] = a[:, 1] - (epsilon/4)*((1 - kappa)*psi_minus[4, 1]*(a[:, 2] - a[:, 1]) + (1 + kappa)*psi_plus[4, 0]*(a[:, 1] - a[:, 0]))
+        elif i == imax:
+            prim_R[:, imax] = primitive_variables[:, imax + 1]
+            T_R[0, imax] = T[0, imax + 1]
+            a_R[0, imax] = a[0, imax + 1]
+            prim_L[:, imax] = primitive_variables[:, imax] + (epsilon/4)*((1 - kappa)*psi_plus[[0, 1, 2], imax - 1]*(primitive_variables[:, imax] - primitive_variables[:, imax - 1]) + (1 + kappa)*psi_minus[[0, 1, 2], imax]*(primitive_variables[:, imax + 1] - primitive_variables[:, imax]))
+            T_L[:, imax] = T[:, imax] + (epsilon/4)*((1 - kappa)*psi_plus[3, imax - 1]*(T[:, imax] - T[:, imax - 1]) + (1 + kappa)*psi_minus[3, imax]*(T[:, imax + 1] - T[:, imax]))
+            a_L[:, imax] = a[:, imax] + (epsilon/4)*((1 - kappa)*psi_plus[4, imax - 1]*(a[:, imax] - a[:, imax - 1]) + (1 + kappa)*psi_minus[4, imax]*(a[:, imax + 1] - a[:, imax]))
+        else:
+            prim_L[:, i] = primitive_variables[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[[0, 1, 2], i - 1]*(primitive_variables[:, i] - primitive_variables[:, imax - 1]) + (1 + kappa)*psi_minus[[0, 1, 2], i]*(primitive_variables[:, i + 1] - primitive_variables[:, i]))
+            T_L[:, i] = T[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[3, i - 1]*(T[:, i] - T[:, i - 1]) + (1 + kappa)*psi_minus[3, i]*(T[:, i + 1] - T[:, i]))
+            a_L[:, i] = a[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[4, i - 1]*(a[:, i] - a[:, i - 1]) + (1 + kappa)*psi_minus[4, i]*(a[:, i + 1] - a[:, i]))
+            prim_R[:, i] = primitive_variables[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[[0, 1, 2], i + 1]*(primitive_variables[:, i + 2] - primitive_variables[:, i + 1]) + (1 + kappa)*psi_plus[[0, 1, 2], i]*(primitive_variables[:, i + 1] - primitive_variables[:, i]))
+            T_R[:, i] = T[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[3, i + 1]*(T[:, i + 2] - T[:, i + 1]) + (1 + kappa)*psi_plus[3, i]*(T[:, i + 1] - T[:, i]))
+            a_R[:, i] = a[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[4, i + 1]*(a[:, i + 2] - a[:, i + 1]) + (1 + kappa)*psi_plus[4, i]*(a[:, i + 1] - a[:, i]))
+
 
 def van_leer_2nd_order():
     extrapolate_for_2nd_order()
     for f_iter in range(imax + 1):
-        van_leer_limiter(f_iter)
+        van_leer_limiter()
         
         
         
