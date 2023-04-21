@@ -6,7 +6,7 @@ from hw_1_func import supersonic_nozzle_exact_solution
 
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
-#rho0 = 1.7416406062063983 # Stagnation density, kg/m3 (calculated, check maybe?)
+kappa = 0
 gamma = 1.4
 R = 8314    # J/(kmol*K)
 m_air = 28.96 # 
@@ -14,7 +14,7 @@ R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
 nmax = 50000 # no. of iterations
-cfl = 0.8
+cfl = 0.7
 
 # ---------- Set geometry ----------
 
@@ -85,12 +85,44 @@ def upwind_boundary_conditions():
     else:
         primitive_variables[2, imax + 1] = 2*pback - primitive_variables[2, imax]
     primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
-    a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(1/2)
+    #a[0, imax + 1] = (gamma*R_air*T[0, imax + 1])**(1/2)
+    a[0, imax + 1] = (gamma*primitive_variables[2, imax + 1]/primitive_variables[0, imax + 1])**(1/2)
     primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
     
     ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
 
 upwind_boundary_conditions()
+
+def upwind_boundary_conditions_try():
+    M[0, 0] = 2*M[0, 1] - M[0, 2]
+    
+    psi_bc_0 = 1 + ((gamma - 1)/2)*M[0, 0]**2
+    T[0, 0] = t0/psi_bc_0
+    primitive_variables[2, 0] = p0/(psi_bc_0**(gamma/(gamma - 1)))
+    primitive_variables[0, 0] = primitive_variables[2, 0]/(R_air*T[0, 0])
+    a[0, 0] = (gamma*R_air*T[0, 0])**(1/2)
+    primitive_variables[1, 0] = M[0, 0]*a[0, 0]
+    
+    ht[0, 0] = ((gamma*R_air)/(gamma - 1))*T[0, 0] + (primitive_variables[1, 0]**2)/2
+    
+    if shock_flag == 0:    
+        psi_bc_1 = 1 + ((gamma - 1)/2)*M[0, imax + 1]**2
+        T[0, imax + 1] = t0/psi_bc_1
+        primitive_variables[2, imax + 1] = p0/(psi_bc_1**(gamma/(gamma - 1)))
+        primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
+        a[0, imax + 1] = (gamma*primitive_variables[2, imax + 1]/primitive_variables[0, imax + 1])**(1/2)
+        primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
+        ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
+
+    else:
+        primitive_variables[2, imax + 1] = 2*pback - primitive_variables[2, imax]
+        T[0, imax + 1] = t0*(primitive_variables[2, imax + 1]/p0)**((gamma - 1)/gamma)
+        primitive_variables[0, imax + 1] = primitive_variables[2, imax + 1]/(R_air*T[:, imax + 1])
+        a[0, imax + 1] = (gamma*primitive_variables[2, imax + 1]/primitive_variables[0, imax + 1])**(1/2)
+        M[0, imax + 1] = (((t0/T[:, imax + 1]) - 1)*(2/(gamma - 1)))**0.5
+        primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
+
+#upwind_boundary_conditions_try()
 
 F = np.zeros((3, imax + 1))
 
@@ -120,7 +152,7 @@ def van_leer_1st_order_flux():
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
-#van_leer_1st_order_flux()
+van_leer_1st_order_flux()
 
 # roe_rho = np.zeros((1, imax + 1))
 # roe_u   = np.zeros((1, imax + 1))
@@ -168,7 +200,40 @@ def roe_1st_order_flux():
             sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
         F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
 
-roe_1st_order_flux()
+#roe_1st_order_flux()
+
+primitive_variables_e = np.zeros((3, 2))
+M_e = np.zeros((1, 2))
+T_e = np.zeros((1, 2))
+a_e = np.zeros((1, 2))
+ht_e= np.zeros((1, 2))
+
+def extrapolate_for_2nd_order():    
+    M_e[0, 0] = 2*M[0, 0] - M[0, 1]
+    psi_bc_0_e = 1 + ((gamma - 1)/2)*M_e[0, 0]**2
+    T_e[0, 0] = t0/psi_bc_0_e
+    primitive_variables_e[2, 0] = p0/(psi_bc_0_e**(gamma/(gamma - 1)))
+    primitive_variables_e[0, 0] = primitive_variables_e[2, 0]/(R_air*T_e[0, 0])
+    a_e[0, 0] = (gamma*R_air*T_e[0, 0])**(1/2)
+    primitive_variables_e[1, 0] = M_e[0, 0]*a_e[0, 0]
+    
+    ht_e[0, 0] = ((gamma*R_air)/(gamma - 1))*T_e[0, 0] + (primitive_variables_e[1, 0]**2)/2
+    
+    M_e[0, 1] = 2*M[0, imax + 1] - M[0, imax]
+    psi_bc_1_e = 1 + ((gamma - 1)/2)*M_e[0, 1]**2
+    T_e[0, 1] = t0/psi_bc_1_e
+    primitive_variables_e[2, 1] = p0/(psi_bc_1_e**(gamma/(gamma - 1)))
+    primitive_variables_e[0, 1] = primitive_variables_e[2, 1]/(R_air*T_e[0, 1])
+    a_e[0, 1] = (gamma*R_air*T_e[0, 1])**(1/2)
+    primitive_variables_e[1, 1] = M_e[0, 1]*a_e[0, 1]
+    
+    ht_e[0, 1] = ((gamma*R_air)/(gamma - 1))*T_e[0, 1] + (primitive_variables_e[1, 1]**2)/2
+    
+def van_leer_2nd_order():
+    ''
+
+def van_leer_limiter(f_iter):
+    r_denominator = ''
 
 # ---------- ---------- ---------- ---------- ---------- ----------
 # TRY TO REDUCE ROUND OFF ERROR
@@ -287,8 +352,9 @@ print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
 
 for j in range(nmax + 1):
     upwind_boundary_conditions()
-    # van_leer_1st_order_flux()
-    roe_1st_order_flux()
+    #upwind_boundary_conditions_try()
+    van_leer_1st_order_flux()
+    #roe_1st_order_flux()
     compute_time_step()
     source_terms()
     primitive_to_conserved_variables()
