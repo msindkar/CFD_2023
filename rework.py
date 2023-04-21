@@ -206,7 +206,6 @@ primitive_variables_e = np.zeros((3, 2))
 M_e = np.zeros((1, 2))
 T_e = np.zeros((1, 2))
 a_e = np.zeros((1, 2))
-ht_e= np.zeros((1, 2))
 
 def extrapolate_for_2nd_order():    
     M_e[0, 0] = 2*M[0, 0] - M[0, 1]
@@ -217,7 +216,6 @@ def extrapolate_for_2nd_order():
     a_e[0, 0] = (gamma*R_air*T_e[0, 0])**(1/2)
     primitive_variables_e[1, 0] = M_e[0, 0]*a_e[0, 0]
     
-    ht_e[0, 0] = ((gamma*R_air)/(gamma - 1))*T_e[0, 0] + (primitive_variables_e[1, 0]**2)/2
     
     M_e[0, 1] = 2*M[0, imax + 1] - M[0, imax]
     psi_bc_1_e = 1 + ((gamma - 1)/2)*M_e[0, 1]**2
@@ -227,17 +225,80 @@ def extrapolate_for_2nd_order():
     a_e[0, 1] = (gamma*R_air*T_e[0, 1])**(1/2)
     primitive_variables_e[1, 1] = M_e[0, 1]*a_e[0, 1]
     
-    ht_e[0, 1] = ((gamma*R_air)/(gamma - 1))*T_e[0, 1] + (primitive_variables_e[1, 1]**2)/2
-    
-def van_leer_2nd_order():
-    ''
+r_plus = np.zeros(5)
+r_minus = np.zeros(5)
+r_den = np.zeros(5)
+psi_plus = np.zeros(5)
+psi_minus = r_den = np.zeros(5)
 
 def van_leer_limiter(f_iter):
-    r_denominator = ''
+    if f_iter == 0:
+        r_den[[0, 1, 2]] = primitive_variables[:, 1] - primitive_variables[:, 0]
+        r_den[[3]] = T[0, 1] - T[0, 0]
+        r_den[[4]] = a[0, 1] - a[0, 0]
+        for i in range(0, 5):
+            if abs(r_den[i]) < 1E-6:
+                r_den[i] = np.sign(r_den[i])*1E-6
+        r_plus[[0, 1, 2]] = (primitive_variables[:, 2] - primitive_variables[:, 1])/r_den[[0, 1, 2]]
+        r_plus[3] = (T[0, 2] - T[0, 1])/r_den[3]
+        r_plus[4] = (a[0, 2] - a[0, 1])/r_den[4]
+        
+        r_minus[[0, 1, 2]] = (primitive_variables[:, 0] - primitive_variables_e[:, 0])/r_den[[0, 1, 2]]
+        r_minus[3] = (T[0, 0] - T_e[0, 0])/r_den[3]
+        r_minus[4] = (a[0, 0] - a_e[0, 0])/r_den[4]
+        
+        # ---------- ---------- ---------- ---------- ---------- ----------
+        # CHECK r-?
+        # ---------- ---------- ---------- ---------- ---------- ----------
+        
+        psi_plus[:] = (r_plus + np.abs(r_plus))/(1 + r_plus)
+        psi_minus[:] = (r_minus + np.abs(r_minus))/(1 + r_minus)
+        
+    elif f_iter == imax:
+        r_den[[0, 1, 2]] = primitive_variables[:, imax + 1] - primitive_variables[:, imax]
+        r_den[[3]] = T[0, imax + 1] - T[0, imax]
+        r_den[[4]] = a[0, imax + 1] - a[0, imax]
+        for i in range(0, 5):
+            if abs(r_den[i]) < 1E-6:
+                r_den[i] = np.sign(r_den[i])*1E-6
+        r_plus[[0, 1, 2]] = (primitive_variables_e[:, 1] - primitive_variables[:, imax + 1])/r_den[[0, 1, 2]]
+        r_plus[3] = (T_e[0, 1] - T[0, imax + 1])/r_den[3]
+        r_plus[4] = (a_e[0, 1] - a[0, imax + 1])/r_den[4]
+        
+        r_minus[[0, 1, 2]] = (primitive_variables[:, imax] - primitive_variables[:, imax - 1])/r_den[[0, 1, 2]]
+        r_minus[3] = (T[0, imax] - T[0, imax - 1])/r_den[3]
+        r_minus[4] = (a[0, imax] - a[0, imax - 1])/r_den[4]
 
-# ---------- ---------- ---------- ---------- ---------- ----------
-# TRY TO REDUCE ROUND OFF ERROR
-# ---------- ---------- ---------- ---------- ---------- ----------
+        psi_plus[:] = (r_plus + np.abs(r_plus))/(1 + r_plus)
+        psi_minus[:] = (r_minus + np.abs(r_minus))/(1 + r_minus)
+        
+    else:
+        r_den[[0, 1, 2]] = primitive_variables[:, f_iter + 1] - primitive_variables[:, f_iter]
+        r_den[[3]] = T[0, f_iter + 1] - T[0, f_iter]
+        r_den[[4]] = a[0, f_iter + 1] - a[0, f_iter]
+        for i in range(0, 5):
+            if abs(r_den[i]) < 1E-6:
+                r_den[i] = np.sign(r_den[i])*1E-6
+        r_plus[[0, 1, 2]] = (primitive_variables[:, f_iter + 2] - primitive_variables[:, f_iter + 1])/r_den[[0, 1, 2]]
+        r_plus[3] = (T[0, f_iter + 2] - T[0, f_iter + 1])/r_den[3]
+        r_plus[4] = (a_e[0, f_iter + 2] - a[0, f_iter + 1])/r_den[4]
+        
+        r_minus[[0, 1, 2]] = (primitive_variables[:, f_iter] - primitive_variables[:, f_iter - 1])/r_den[[0, 1, 2]]
+        r_minus[3] = (T[0, f_iter] - T[0, f_iter - 1])/r_den[3]
+        r_minus[4] = (a[0, f_iter] - a[0, f_iter - 1])/r_den[4]
+
+        psi_plus[:] = (r_plus + np.abs(r_plus))/(1 + r_plus)
+        psi_minus[:] = (r_minus + np.abs(r_minus))/(1 + r_minus)  
+
+prim_L = np.zeros(3)
+prim_R = np.zeros(3)
+T_L    = np.zeros(3)
+T_R    = np.zeros(3)
+a_L    = np.zeros(3)
+a_R    = np.zeros(3)
+
+def van_leer_2nd_order():
+    ''
 
 conserved_variables = np.zeros((3, imax))
 
