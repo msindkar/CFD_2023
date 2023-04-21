@@ -14,7 +14,7 @@ R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
 nmax = 50000 # no. of iterations
-cfl = 0.8
+cfl = 0.7
 
 # ---------- Set geometry ----------
 
@@ -92,6 +92,27 @@ def upwind_boundary_conditions():
 
 upwind_boundary_conditions()
 
+def upwind_boundary_conditions_try():
+    M[0, 0] = 2*M[0, 1] - M[0, 2]
+    T[0, 0] = 2*T[0, 1] - T[0, 2]
+    a[0, 0] = 2*a[0, 1] - a[0, 2]
+    ht[0, 0]= 2*ht[0, 1] - ht[0, 2]
+    primitive_variables[:, 0] = 2*primitive_variables[:, 1] - primitive_variables[:, 2]
+    
+    M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]
+    T[0, imax + 1] = 2*T[0, imax] - T[0, imax - 1]
+    a[0, imax + 1] = 2*a[0, imax] - a[0, imax - 1]
+    ht[0, imax + 1]= 2*ht[0, imax] - ht[0, imax - 1]
+    primitive_variables[0, imax + 1] = 2*primitive_variables[0, imax] - primitive_variables[0, imax - 1]
+    primitive_variables[1, imax + 1] = 2*primitive_variables[1, imax] - primitive_variables[1, imax - 1]
+    if shock_flag == 0:
+        primitive_variables[2, imax + 1] = 2*primitive_variables[2, imax] - primitive_variables[2, imax - 1]
+    else:
+        primitive_variables[2, imax + 1] = 2*pback - primitive_variables[2, imax]
+
+#upwind_boundary_conditions_try()
+    
+
 F = np.zeros((3, imax + 1))
 
 def van_leer_1st_order_flux():
@@ -120,7 +141,7 @@ def van_leer_1st_order_flux():
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
-#van_leer_1st_order_flux()
+van_leer_1st_order_flux()
 
 # roe_rho = np.zeros((1, imax + 1))
 # roe_u   = np.zeros((1, imax + 1))
@@ -168,7 +189,7 @@ def roe_1st_order_flux():
             sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
         F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
 
-roe_1st_order_flux()
+#roe_1st_order_flux()
 
 # ---------- ---------- ---------- ---------- ---------- ----------
 # TRY TO REDUCE ROUND OFF ERROR
@@ -287,8 +308,9 @@ print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
 
 for j in range(nmax + 1):
     upwind_boundary_conditions()
-    # van_leer_1st_order_flux()
-    roe_1st_order_flux()
+    #upwind_boundary_conditions_try()
+    van_leer_1st_order_flux()
+    #roe_1st_order_flux()
     compute_time_step()
     source_terms()
     primitive_to_conserved_variables()
