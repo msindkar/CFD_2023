@@ -13,7 +13,7 @@ m_air = 28.96 #
 R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
-nmax = 50000 # no. of iterations
+nmax = 10490 # no. of iterations
 cfl = 0.7
 
 # ---------- Set geometry ----------
@@ -91,7 +91,7 @@ def upwind_boundary_conditions():
     
     ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
 
-upwind_boundary_conditions()
+#upwind_boundary_conditions()
 
 def upwind_boundary_conditions_try():
     M[0, 0] = 2*M[0, 1] - M[0, 2]
@@ -123,7 +123,7 @@ def upwind_boundary_conditions_try():
         M[0, imax + 1] = (((t0/T[:, imax + 1]) - 1)*(2/(gamma - 1)))**0.5
         primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
 
-#upwind_boundary_conditions_try()
+upwind_boundary_conditions_try()
 
 F = np.zeros((3, imax + 1))
 
@@ -153,7 +153,7 @@ def van_leer_1st_order_flux():
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
-van_leer_1st_order_flux()
+#van_leer_1st_order_flux()
 
 lam     = np.zeros((1, 3))
 r_eig   = np.zeros((3, 3))
@@ -193,12 +193,12 @@ def roe_1st_order_flux():
             sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
         F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
 
-#roe_1st_order_flux()
+roe_1st_order_flux()
 
 primitive_variables_e = np.zeros((3, 2))
 M_e = np.zeros((1, 2))
 T_e = np.zeros((1, 2))
-a_e = np.zeros((1, 2))
+# a_e = np.zeros((1, 2))
 
 def extrapolate_for_2nd_order():    
     M_e[0, 0] = 2*M[0, 0] - M[0, 1]
@@ -206,8 +206,8 @@ def extrapolate_for_2nd_order():
     T_e[0, 0] = t0/psi_bc_0_e
     primitive_variables_e[2, 0] = p0/(psi_bc_0_e**(gamma/(gamma - 1)))
     primitive_variables_e[0, 0] = primitive_variables_e[2, 0]/(R_air*T_e[0, 0])
-    a_e[0, 0] = (gamma*R_air*T_e[0, 0])**(1/2)
-    primitive_variables_e[1, 0] = M_e[0, 0]*a_e[0, 0]
+    # a_e[0, 0] = (gamma*R_air*T_e[0, 0])**(1/2)
+    primitive_variables_e[1, 0] = M_e[0, 0]*(gamma*R_air*T_e[0, 0])
     
     
     M_e[0, 1] = 2*M[0, imax + 1] - M[0, imax]
@@ -215,31 +215,31 @@ def extrapolate_for_2nd_order():
     T_e[0, 1] = t0/psi_bc_1_e
     primitive_variables_e[2, 1] = p0/(psi_bc_1_e**(gamma/(gamma - 1)))
     primitive_variables_e[0, 1] = primitive_variables_e[2, 1]/(R_air*T_e[0, 1])
-    a_e[0, 1] = (gamma*R_air*T_e[0, 1])**(1/2)
-    primitive_variables_e[1, 1] = M_e[0, 1]*a_e[0, 1]
+    # a_e[0, 1] = (gamma*R_air*T_e[0, 1])**(1/2)
+    primitive_variables_e[1, 1] = M_e[0, 1]*(gamma*R_air*T_e[0, 1])
     
-r_plus = np.zeros(5)
-r_minus = np.zeros(5)
-r_den = np.zeros(5)
-psi_plus = np.zeros((5, imax + 1))
-psi_minus = np.zeros((5, imax + 1))
+r_plus = np.zeros((4, imax + 1))
+r_minus = np.zeros((4, imax + 1))
+r_den = np.zeros((4, imax + 1))
+psi_plus = np.zeros((4, imax + 1))
+psi_minus = np.zeros((4, imax + 1))
 
 def van_leer_limiter():
     for i in range(imax + 1):
         if i == 0:
-            r_den[[0, 1, 2]] = primitive_variables[:, 1] - primitive_variables[:, 0]
-            r_den[[3]] = T[0, 1] - T[0, 0]
-            r_den[[4]] = a[0, 1] - a[0, 0]
-            for g in range(0, 5):
-                if abs(r_den[g]) < 1E-6:
-                    r_den[g] = np.sign(r_den[g])*1E-6
-            r_plus[[0, 1, 2]] = (primitive_variables[:, 2] - primitive_variables[:, 1])/r_den[[0, 1, 2]]
-            r_plus[3] = (T[0, 2] - T[0, 1])/r_den[3]
-            r_plus[4] = (a[0, 2] - a[0, 1])/r_den[4]
+            r_den[[0, 1, 2], 0] = primitive_variables[:, 1] - primitive_variables[:, 0]
+            r_den[[3], 0] = T[0, 1] - T[0, 0]
+            # r_den[[4], 0] = a[0, 1] - a[0, 0]
+            for g in range(0, 4):
+                if abs(r_den[g, 0]) < 1E-6:
+                    r_den[g, 0] = np.sign(r_den[g, 0])*1E-6
+            r_plus[[0, 1, 2], 0] = (primitive_variables[:, 2] - primitive_variables[:, 1])/r_den[[0, 1, 2], 0]
+            r_plus[3, 0] = (T[0, 2] - T[0, 1])/r_den[3, 0]
+            # r_plus[4, 0] = (a[0, 2] - a[0, 1])/r_den[4, 0]
             
-            r_minus[[0, 1, 2]] = (primitive_variables[:, 0] - primitive_variables_e[:, 0])/r_den[[0, 1, 2]]
-            r_minus[3] = (T[0, 0] - T_e[0, 0])/r_den[3]
-            r_minus[4] = (a[0, 0] - a_e[0, 0])/r_den[4]
+            r_minus[[0, 1, 2], 0] = (primitive_variables[:, 0] - primitive_variables_e[:, 0])/r_den[[0, 1, 2], 0]
+            r_minus[3, 0] = (T[0, 0] - T_e[0, 0])/r_den[3, 0]
+            # r_minus[4] = (a[0, 0] - a_e[0, 0])/r_den[4]
             
             # psi_plus[:, 0] = (r_plus + np.abs(r_plus))/(1 + r_plus)
             # psi_minus[:, 0] = (r_minus + np.abs(r_minus))/(1 + r_minus)
@@ -249,50 +249,48 @@ def van_leer_limiter():
             # ---------- ---------- ---------- ---------- ---------- ----------
             
         elif i == imax:
-            r_den[[0, 1, 2]] = primitive_variables[:, imax + 1] - primitive_variables[:, imax]
-            r_den[[3]] = T[0, imax + 1] - T[0, imax]
-            r_den[[4]] = a[0, imax + 1] - a[0, imax]
-            for g in range(0, 5):
-                if abs(r_den[g]) < 1E-6:
-                    r_den[g] = np.sign(r_den[g])*1E-6
-            r_plus[[0, 1, 2]] = (primitive_variables_e[:, 1] - primitive_variables[:, imax + 1])/r_den[[0, 1, 2]]
-            r_plus[3] = (T_e[0, 1] - T[0, imax + 1])/r_den[3]
-            r_plus[4] = (a_e[0, 1] - a[0, imax + 1])/r_den[4]
+            r_den[[0, 1, 2], imax] = primitive_variables[:, imax + 1] - primitive_variables[:, imax]
+            r_den[[3], imax] = T[0, imax + 1] - T[0, imax]
+            # r_den[[4], imax] = a[0, imax + 1] - a[0, imax]
+            for g in range(0, 4):
+                if abs(r_den[g, imax]) < 1E-6:
+                    r_den[g, imax] = np.sign(r_den[g, imax])*1E-6
+            r_plus[[0, 1, 2], imax] = (primitive_variables_e[:, 1] - primitive_variables[:, imax + 1])/r_den[[0, 1, 2], imax]
+            r_plus[3, imax] = (T_e[0, 1] - T[0, imax + 1])/r_den[3, imax]
+            # r_plus[4] = (a_e[0, 1] - a[0, imax + 1])/r_den[4]
             
-            r_minus[[0, 1, 2]] = (primitive_variables[:, imax] - primitive_variables[:, imax - 1])/r_den[[0, 1, 2]]
-            r_minus[3] = (T[0, imax] - T[0, imax - 1])/r_den[3]
-            r_minus[4] = (a[0, imax] - a[0, imax - 1])/r_den[4]
+            r_minus[[0, 1, 2], imax] = (primitive_variables[:, imax] - primitive_variables[:, imax - 1])/r_den[[0, 1, 2], imax]
+            r_minus[3, imax] = (T[0, imax] - T[0, imax - 1])/r_den[3, imax]
+            # r_minus[4, imax] = (a[0, imax] - a[0, imax - 1])/r_den[4, imax]
             
             # psi_plus[:, imax] = (r_plus + np.abs(r_plus))/(1 + r_plus)
             # psi_minus[:, imax] = (r_minus + np.abs(r_minus))/(1 + r_minus)
             
         else:
-            r_den[[0, 1, 2]] = primitive_variables[:, i + 1] - primitive_variables[:, i]
-            r_den[[3]] = T[0, i + 1] - T[0, i]
-            r_den[[4]] = a[0, i + 1] - a[0, i]
-            for g in range(0, 5):
-                if abs(r_den[g]) < 1E-6:
-                    r_den[g] = np.sign(r_den[g])*1E-6
-            r_plus[[0, 1, 2]] = (primitive_variables[:, i + 2] - primitive_variables[:, i + 1])/r_den[[0, 1, 2]]
-            r_plus[3] = (T[0, i + 2] - T[0, i + 1])/r_den[3]
-            r_plus[4] = (a[0, i + 2] - a[0, i + 1])/r_den[4]
+            r_den[[0, 1, 2], i] = primitive_variables[:, i + 1] - primitive_variables[:, i]
+            r_den[[3], i] = T[0, i + 1] - T[0, i]
+            # r_den[[4], i] = a[0, i + 1] - a[0, i]
+            for g in range(0, 4):
+                if abs(r_den[g, i]) < 1E-6:
+                    r_den[g, i] = np.sign(r_den[g, i])*1E-6
+            r_plus[[0, 1, 2], i] = (primitive_variables[:, i + 2] - primitive_variables[:, i + 1])/r_den[[0, 1, 2], i]
+            r_plus[3, i] = (T[0, i + 2] - T[0, i + 1])/r_den[3, i]
+            # r_plus[4, i] = (a[0, i + 2] - a[0, i + 1])/r_den[4]
             
-            r_minus[[0, 1, 2]] = (primitive_variables[:, i] - primitive_variables[:, i - 1])/r_den[[0, 1, 2]]
-            r_minus[3] = (T[0, i] - T[0, i - 1])/r_den[3]
-            r_minus[4] = (a[0, i] - a[0, i - 1])/r_den[4]
+            r_minus[[0, 1, 2], i] = (primitive_variables[:, i] - primitive_variables[:, i - 1])/r_den[[0, 1, 2], i]
+            r_minus[3, i] = (T[0, i] - T[0, i - 1])/r_den[3, i]
+            # r_minus[4] = (a[0, i] - a[0, i - 1])/r_den[4]
             
             # psi_plus[:, i] = (r_plus + np.abs(r_plus))/(1 + r_plus)
             # psi_minus[:, i] = (r_minus + np.abs(r_minus))/(1 + r_minus)
         
-        psi_plus[:, i] = (r_plus + np.abs(r_plus))/(1 + r_plus)
-        psi_minus[:, i] = (r_minus + np.abs(r_minus))/(1 + r_minus)
+        psi_plus[:, i] = (r_plus[:, i] + np.abs(r_plus[:, i]))/(1 + r_plus[:, i])
+        psi_minus[:, i] = (r_minus[:, i] + np.abs(r_minus[:, i]))/(1 + r_minus[:, i])
 
 prim_L = np.zeros((3, imax + 1))
 prim_R = np.zeros((3, imax + 1))
 T_L    = np.zeros((1, imax + 1))
 T_R    = np.zeros((1, imax + 1))
-# a_L    = np.zeros((1, imax + 1))
-# a_R    = np.zeros((1, imax + 1))
 epsilon= 0
 
 def compute_LR_states_2nd_order():
@@ -301,24 +299,18 @@ def compute_LR_states_2nd_order():
         if i == 0:
             prim_L[:, 0] = primitive_variables[:, 0]
             T_L[0, 0] = T[0, 0]
-            # a_L[0, 0] = a[0, 0]
             prim_R[:, 0] = primitive_variables[:, 1] - (epsilon/4)*((1 - kappa)*psi_minus[[0, 1, 2], 1]*(primitive_variables[:, 2] - primitive_variables[:, 1]) + (1 + kappa)*psi_plus[[0, 1, 2], 0]*(primitive_variables[:, 1] - primitive_variables[:, 0]))
             T_R[:, 0] = T[:, 1] - (epsilon/4)*((1 - kappa)*psi_minus[3, 1]*(T[:, 2] - T[:, 1]) + (1 + kappa)*psi_plus[3, 0]*(T[:, 1] - T[:, 0]))
-            # a_R[:, 0] = a[:, 1] - (epsilon/4)*((1 - kappa)*psi_minus[4, 1]*(a[:, 2] - a[:, 1]) + (1 + kappa)*psi_plus[4, 0]*(a[:, 1] - a[:, 0]))
         elif i == imax:
             prim_R[:, imax] = primitive_variables[:, imax + 1]
             T_R[0, imax] = T[0, imax + 1]
-            # a_R[0, imax] = a[0, imax + 1]
             prim_L[:, imax] = primitive_variables[:, imax] + (epsilon/4)*((1 - kappa)*psi_plus[[0, 1, 2], imax - 1]*(primitive_variables[:, imax] - primitive_variables[:, imax - 1]) + (1 + kappa)*psi_minus[[0, 1, 2], imax]*(primitive_variables[:, imax + 1] - primitive_variables[:, imax]))
             T_L[:, imax] = T[:, imax] + (epsilon/4)*((1 - kappa)*psi_plus[3, imax - 1]*(T[:, imax] - T[:, imax - 1]) + (1 + kappa)*psi_minus[3, imax]*(T[:, imax + 1] - T[:, imax]))
-            # a_L[:, imax] = a[:, imax] + (epsilon/4)*((1 - kappa)*psi_plus[4, imax - 1]*(a[:, imax] - a[:, imax - 1]) + (1 + kappa)*psi_minus[4, imax]*(a[:, imax + 1] - a[:, imax]))
         else:
-            prim_L[:, i] = primitive_variables[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[[0, 1, 2], i - 1]*(primitive_variables[:, i] - primitive_variables[:, imax - 1]) + (1 + kappa)*psi_minus[[0, 1, 2], i]*(primitive_variables[:, i + 1] - primitive_variables[:, i]))
+            prim_L[:, i] = primitive_variables[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[[0, 1, 2], i - 1]*(primitive_variables[:, i] - primitive_variables[:, i - 1]) + (1 + kappa)*psi_minus[[0, 1, 2], i]*(primitive_variables[:, i + 1] - primitive_variables[:, i]))
             T_L[:, i] = T[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[3, i - 1]*(T[:, i] - T[:, i - 1]) + (1 + kappa)*psi_minus[3, i]*(T[:, i + 1] - T[:, i]))
-            # a_L[:, i] = a[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[4, i - 1]*(a[:, i] - a[:, i - 1]) + (1 + kappa)*psi_minus[4, i]*(a[:, i + 1] - a[:, i]))
             prim_R[:, i] = primitive_variables[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[[0, 1, 2], i + 1]*(primitive_variables[:, i + 2] - primitive_variables[:, i + 1]) + (1 + kappa)*psi_plus[[0, 1, 2], i]*(primitive_variables[:, i + 1] - primitive_variables[:, i]))
             T_R[:, i] = T[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[3, i + 1]*(T[:, i + 2] - T[:, i + 1]) + (1 + kappa)*psi_plus[3, i]*(T[:, i + 1] - T[:, i]))
-            # a_R[:, i] = a[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[4, i + 1]*(a[:, i + 2] - a[:, i + 1]) + (1 + kappa)*psi_plus[4, i]*(a[:, i + 1] - a[:, i]))
             
 def van_leer_2nd_order_flux():
     extrapolate_for_2nd_order()
@@ -353,6 +345,46 @@ def van_leer_2nd_order_flux():
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
         
 conserved_variables = np.zeros((3, imax))
+
+def roe_2nd_order_flux():
+    extrapolate_for_2nd_order()
+    van_leer_limiter()
+    compute_LR_states_2nd_order()
+    for i in range(imax + 1):
+        roe_R   = (prim_R[0, i]/prim_L[0, i])**(1/2)
+        roe_rho = roe_R*prim_L[0, i]
+        roe_u   = (roe_R*prim_R[1, i] + prim_L[1, i])/(roe_R + 1)
+        
+        ht_L = ((gamma*R_air)/(gamma - 1))*T_L[0, i] + (prim_L[1, i]**2)/2
+        ht_R = ((gamma*R_air)/(gamma - 1))*T_R[0, i] + (prim_R[1, i]**2)/2
+        
+        roe_ht  = (roe_R*ht_R + ht_L)/(roe_R + 1)
+        roe_a2  = (gamma - 1)*(roe_ht - (roe_u**2)/2)
+        k = 0
+        lam[0, 0]     = roe_u
+        lam[0, 1]     = roe_u + (roe_a2)**(0.5)
+        lam[0, 2]     = roe_u - (roe_a2)**(0.5)
+        lam_p   = np.zeros((1, 3))
+        lam_m   = np.zeros((1, 3))
+        for o in lam[0, :]<0:
+            if o:
+                lam_m[0, k] = lam[0, k]
+            else:
+                lam_p[0, k] = lam[0, k]
+            k+=1
+        r_eig[:, 0] = np.array([1, roe_u, (roe_u**2)/2]).transpose()
+        r_eig[:, 1] =  (roe_rho/(2*(roe_a2**0.5)))*np.array([1, roe_u + (roe_a2)**(0.5), roe_ht + roe_u*(roe_a2)**(0.5)])
+        r_eig[:, 2] = -(roe_rho/(2*(roe_a2**0.5)))*np.array([1, roe_u - (roe_a2)**(0.5), roe_ht - roe_u*(roe_a2)**(0.5)])
+        d_w  [0, 0] = (prim_R[0, i] - prim_L[0, i]) - (prim_R[2, i] - prim_L[2, i])/roe_a2
+        d_w  [0, 1] = (prim_R[1, i] - prim_L[1, i]) + (prim_R[2, i] - prim_L[2, i])/(roe_rho*(roe_a2**0.5))
+        d_w  [0, 2] = (prim_R[1, i] - prim_L[1, i]) - (prim_R[2, i] - prim_L[2, i])/(roe_rho*(roe_a2**0.5))
+        fi[:, 0]    = np.array([prim_L[0, i]*prim_L[1, i], prim_L[0, i]*prim_L[1, i]**2 + prim_L[2, i], prim_L[0, i]*prim_L[1, i]*ht_L])
+        fi1[:, 0]   = np.array([prim_R[0, i]*prim_R[1, i], prim_R[0, i]*prim_R[1, i]**2 + prim_R[2, i], prim_R[0, i]*prim_R[1, i]*ht_R])
+        sigma   = np.zeros((3, 1))
+        for q in range(3):
+            sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
+        F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
+
 
 def primitive_to_conserved_variables():
     conserved_variables[0, :] = primitive_variables[0, cell_alias]
@@ -464,15 +496,16 @@ def de_norms():
 print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
 
 for j in range(nmax + 1):
-    if j == 3000:
+    if j == 1000:
         epsilon = 1
-        cfl = 0.7
+        cfl = 0.4
         print('---------- Switched to 2nd order ----------')
-    upwind_boundary_conditions()
-    #upwind_boundary_conditions_try()
-    # van_leer_1st_order_flux()
-    van_leer_2nd_order_flux()
+    #upwind_boundary_conditions()
+    upwind_boundary_conditions_try()
+    #van_leer_1st_order_flux()
+    #van_leer_2nd_order_flux()
     #roe_1st_order_flux()
+    roe_2nd_order_flux()
     compute_time_step()
     source_terms()
     primitive_to_conserved_variables()
