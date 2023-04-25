@@ -6,7 +6,7 @@ from hw_1_func import supersonic_nozzle_exact_solution
 
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
-kappa = 1
+kappa = 0
 gamma = 1.4
 R = 8314    # J/(kmol*K)
 m_air = 28.96 # 
@@ -179,9 +179,9 @@ def roe_1st_order_flux():
             sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
         F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
 
-primitive_variables_e = np.zeros((3, 2))
-M_e = np.zeros((1, 2))
-T_e = np.zeros((1, 2))
+# primitive_variables_e = np.zeros((3, 2))
+# M_e = np.zeros((1, 2))
+# T_e = np.zeros((1, 2))
 
 def extrapolate_for_2nd_order():    
     M_e[0, 0] = 2*M[0, 0] - M[0, 1]
@@ -189,7 +189,7 @@ def extrapolate_for_2nd_order():
     T_e[0, 0] = t0/psi_bc_0_e
     primitive_variables_e[2, 0] = p0/(psi_bc_0_e**(gamma/(gamma - 1)))
     primitive_variables_e[0, 0] = primitive_variables_e[2, 0]/(R_air*T_e[0, 0])
-    primitive_variables_e[1, 0] = M_e[0, 0]*(gamma*R_air*T_e[0, 0])
+    primitive_variables_e[1, 0] = M_e[0, 0]*(gamma*R_air*T_e[0, 0])**(0.5)
     
     
     M_e[0, 1] = 2*M[0, imax + 1] - M[0, imax]
@@ -197,13 +197,13 @@ def extrapolate_for_2nd_order():
     T_e[0, 1] = t0/psi_bc_1_e
     primitive_variables_e[2, 1] = p0/(psi_bc_1_e**(gamma/(gamma - 1)))
     primitive_variables_e[0, 1] = primitive_variables_e[2, 1]/(R_air*T_e[0, 1])
-    primitive_variables_e[1, 1] = M_e[0, 1]*(gamma*R_air*T_e[0, 1])
+    primitive_variables_e[1, 1] = M_e[0, 1]*(gamma*R_air*T_e[0, 1])**(0.5)
     
-r_plus = np.zeros((4, imax + 1))
-r_minus = np.zeros((4, imax + 1))
-r_den = np.zeros((4, imax + 1))
-psi_plus = np.zeros((4, imax + 1))
-psi_minus = np.zeros((4, imax + 1))
+# r_plus = np.zeros((4, imax + 1))
+# r_minus = np.zeros((4, imax + 1))
+# r_den = np.zeros((4, imax + 1))
+# psi_plus = np.zeros((4, imax + 1))
+# psi_minus = np.zeros((4, imax + 1))
 
 def van_leer_limiter():
     for i in range(imax + 1):
@@ -250,11 +250,11 @@ def van_leer_limiter():
         psi_plus[:, i] = (r_plus[:, i] + np.abs(r_plus[:, i]))/(1 + r_plus[:, i])
         psi_minus[:, i] = (r_minus[:, i] + np.abs(r_minus[:, i]))/(1 + r_minus[:, i])
 
-prim_L = np.zeros((3, imax + 1))
-prim_R = np.zeros((3, imax + 1))
-T_L    = np.zeros((1, imax + 1))
-T_R    = np.zeros((1, imax + 1))
-epsilon= 0
+# prim_L = np.zeros((3, imax + 1))
+# prim_R = np.zeros((3, imax + 1))
+# T_L    = np.zeros((1, imax + 1))
+# T_R    = np.zeros((1, imax + 1))
+# epsilon= 0
 
 def compute_LR_states_2nd_order():
     for i in range(imax + 1):
@@ -273,6 +273,76 @@ def compute_LR_states_2nd_order():
             T_L[:, i] = T[:, i] + (epsilon/4)*((1 - kappa)*psi_plus[3, i - 1]*(T[:, i] - T[:, i - 1]) + (1 + kappa)*psi_minus[3, i]*(T[:, i + 1] - T[:, i]))
             prim_R[:, i] = primitive_variables[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[[0, 1, 2], i + 1]*(primitive_variables[:, i + 2] - primitive_variables[:, i + 1]) + (1 + kappa)*psi_plus[[0, 1, 2], i]*(primitive_variables[:, i + 1] - primitive_variables[:, i]))
             T_R[:, i] = T[:, i + 1] - (epsilon/4)*((1 - kappa)*psi_minus[3, i + 1]*(T[:, i + 2] - T[:, i + 1]) + (1 + kappa)*psi_plus[3, i]*(T[:, i + 1] - T[:, i]))
+
+primitive_variables_e = np.zeros((3, imax + 6))
+M_e = np.zeros((1, imax + 6))
+T_e = np.zeros((1, imax + 6))
+
+r_plus = np.zeros((4, 1))
+r_minus = np.zeros((4, 1))
+r_den = np.zeros((4, 1))
+psi_plus = np.zeros((4, imax + 3))
+psi_minus = np.zeros((4, imax + 3))
+
+prim_L = np.zeros((3, imax + 1))
+prim_R = np.zeros((3, imax + 1))
+T_L    = np.zeros((1, imax + 1))
+T_R    = np.zeros((1, imax + 1))
+epsilon= 0
+
+def extrapolate_for_2nd_order_ePsi():
+    M_e[0, 1] = 2*M[0, 0] - M[0, 1]
+    psi_bc_0_e = 1 + ((gamma - 1)/2)*M_e[0, 1]**2
+    T_e[0, 1] = t0/psi_bc_0_e
+    primitive_variables_e[2, 1] = p0/(psi_bc_0_e**(gamma/(gamma - 1)))
+    primitive_variables_e[0, 1] = primitive_variables_e[2, 1]/(R_air*T_e[0, 1])
+    primitive_variables_e[1, 1] = M_e[0, 1]*(gamma*R_air*T_e[0, 1])**(0.5)
+    
+    M_e[0, 0] = 2*M_e[0, 1] - M[0, 0]
+    psi_bc_0_e = 1 + ((gamma - 1)/2)*M_e[0, 0]**2
+    T_e[0, 0] = t0/psi_bc_0_e
+    primitive_variables_e[2, 0] = p0/(psi_bc_0_e**(gamma/(gamma - 1)))
+    primitive_variables_e[0, 0] = primitive_variables_e[2, 0]/(R_air*T_e[0, 0])
+    primitive_variables_e[1, 0] = M_e[0, 0]*(gamma*R_air*T_e[0, 0])**(0.5)
+    
+    M_e[0, imax + 4] = 2*M[0, imax + 1] - M[0, imax]
+    psi_bc_1_e = 1 + ((gamma - 1)/2)*M_e[0, imax + 4]**2
+    T_e[0, imax + 4] = t0/psi_bc_1_e
+    primitive_variables_e[2, imax + 4] = p0/(psi_bc_1_e**(gamma/(gamma - 1)))
+    primitive_variables_e[0, imax + 4] = primitive_variables_e[2, imax + 4]/(R_air*T_e[0, imax + 4])
+    primitive_variables_e[1, imax + 4] = M_e[0, imax + 4]*(gamma*R_air*T_e[0, imax + 4])**(0.5)
+    
+    M_e[0, imax + 5] = 2*M_e[0, imax + 4] - M[0, imax + 1]
+    psi_bc_1_e = 1 + ((gamma - 1)/2)*M_e[0, imax + 5]**2
+    T_e[0, imax + 5] = t0/psi_bc_1_e
+    primitive_variables_e[2, imax + 5] = p0/(psi_bc_1_e**(gamma/(gamma - 1)))
+    primitive_variables_e[0, imax + 5] = primitive_variables_e[2, imax + 5]/(R_air*T_e[0, imax + 5])
+    primitive_variables_e[1, imax + 5] = M_e[0, imax + 5]*(gamma*R_air*T_e[0, imax + 5])**(0.5)
+    
+    primitive_variables_e[:, 2:imax + 4] = primitive_variables[:, :]
+    T_e[:, 2:imax + 4] = T[:, :]
+
+def van_leer_limiter_ePsi():
+    for i in range(imax + 3):
+        h = i + 1
+        r_den[[0, 1, 2], 0] = primitive_variables_e[:, h + 1] - primitive_variables_e[:, h]
+        r_den[3] = T_e[:, h + 1] - T_e[:, h]
+        
+        for g in range(0, 4):
+            if abs(r_den[g]) < 1E-6:
+                r_den[g] = np.sign(r_den[g])*1E-6
+        
+        r_plus[[1, 2, 3], 0] = (primitive_variables_e[:, h + 2] - primitive_variables_e[:, h + 1])/r_den[[0, 1, 2], 0]
+        r_plus[3] = (T_e[0, h + 2] - T_e[0, h + 1])/r_den[3]
+        
+        r_minus[[1, 2, 3], 0] = (primitive_variables_e[:, h] - primitive_variables_e[:, h - 1])/r_den[[0, 1, 2], 0]
+        r_plus[3] = (T_e[0, h] - T_e[0, h - 1])/r_den[3]
+        
+        psi_plus[:, i] = (r_plus[:, 0] + np.abs(r_plus[:, 0]))/(1 + r_plus[:, 0])
+        psi_minus[:, i] = (r_minus[:, 0] + np.abs(r_minus[:, 0]))/(1 + r_minus[:, 0])
+            
+def compute_LR_states_2nd_order_ePsi():
+    ''
             
 def van_leer_2nd_order_flux():
     extrapolate_for_2nd_order()
