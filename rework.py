@@ -6,14 +6,14 @@ from hw_1_func import supersonic_nozzle_exact_solution
 
 p0 = 3E5 # Stagnation pressure, Pa
 t0 = 600 # Stagnation temperature, K
-kappa = 0
+kappa = 1
 gamma = 1.4
 R = 8314    # J/(kmol*K)
 m_air = 28.96 # 
 R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
-nmax = 10490 # no. of iterations
+nmax = 50000 # no. of iterations
 cfl = 0.7
 
 # ---------- Set geometry ----------
@@ -31,21 +31,15 @@ dA_dx  = 0.4*np.pi*np.cos(np.pi*x_cell - np.pi*0.5)
 
 V = A_cell*dx # cell volume based on areas a cell centers
 
-# ---------- Check case ----------
-
 print('1 for isentropic case, anything else for shock case')
 if int(input()) == 1:
     shock_flag = 0
     exact_solution = supersonic_nozzle_exact_solution(p0, t0, imax)
 else:
     shock_flag = 1
-    #pback = 1.2E5 # Back pressure for shock case, Pa
-    
-# ---------- Set inital conditions ----------
 
 primitive_variables = np.zeros((3, imax + 2))    # Array of cell centers, even number, 2 ghost cells, rho u P
 cell_alias = list(range(1, imax + 1))     # Alias range for non-ghost cells easier indexing
-#intf_alias = list(range(1, imax + 2))     # Alias range for non-ghost interfaces easier indexing
 M = np.zeros((1, imax + 2))
 T = np.zeros((1, imax + 2))
 a = np.zeros((1, imax + 2))
@@ -61,8 +55,6 @@ a[0, cell_alias] = (gamma*R_air*T[0, cell_alias])**(0.5)
 primitive_variables[1, cell_alias] = M[0, cell_alias]*a[0, cell_alias]
 
 ht[0, cell_alias] = ((gamma*R_air)/(gamma - 1))*T[0, cell_alias] + (primitive_variables[1, cell_alias]**2)/2
-
-# ---------- ---------- ----------
 
 def upwind_boundary_conditions():
     M[0, 0] = 2*M[0, 1] - M[0, 2]
@@ -90,8 +82,6 @@ def upwind_boundary_conditions():
     primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
     
     ht[0, imax + 1] = ((gamma*R_air)/(gamma - 1))*T[0, imax + 1] + (primitive_variables[1, imax + 1]**2)/2
-
-#upwind_boundary_conditions()
 
 def upwind_boundary_conditions_try():
     M[0, 0] = 2*M[0, 1] - M[0, 2]
@@ -123,8 +113,6 @@ def upwind_boundary_conditions_try():
         M[0, imax + 1] = (((t0/T[:, imax + 1]) - 1)*(2/(gamma - 1)))**0.5
         primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
 
-upwind_boundary_conditions_try()
-
 F = np.zeros((3, imax + 1))
 
 def van_leer_1st_order_flux():
@@ -152,8 +140,6 @@ def van_leer_1st_order_flux():
         F_P_m = np.array([0, D_minus*primitive_variables[2, i + 1], 0])
         
         F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
-        
-#van_leer_1st_order_flux()
 
 lam     = np.zeros((1, 3))
 r_eig   = np.zeros((3, 3))
@@ -193,12 +179,9 @@ def roe_1st_order_flux():
             sigma[:, 0] = sigma[:, 0] + (lam_p[0, q] - lam_m[0, q])*d_w[0, q]*r_eig[:, q]
         F[:, i] = 0.5*(fi[:, 0] + fi1[:, 0]) - 0.5*sigma[:, 0]
 
-roe_1st_order_flux()
-
 primitive_variables_e = np.zeros((3, 2))
 M_e = np.zeros((1, 2))
 T_e = np.zeros((1, 2))
-# a_e = np.zeros((1, 2))
 
 def extrapolate_for_2nd_order():    
     M_e[0, 0] = 2*M[0, 0] - M[0, 1]
@@ -206,7 +189,6 @@ def extrapolate_for_2nd_order():
     T_e[0, 0] = t0/psi_bc_0_e
     primitive_variables_e[2, 0] = p0/(psi_bc_0_e**(gamma/(gamma - 1)))
     primitive_variables_e[0, 0] = primitive_variables_e[2, 0]/(R_air*T_e[0, 0])
-    # a_e[0, 0] = (gamma*R_air*T_e[0, 0])**(1/2)
     primitive_variables_e[1, 0] = M_e[0, 0]*(gamma*R_air*T_e[0, 0])
     
     
@@ -215,7 +197,6 @@ def extrapolate_for_2nd_order():
     T_e[0, 1] = t0/psi_bc_1_e
     primitive_variables_e[2, 1] = p0/(psi_bc_1_e**(gamma/(gamma - 1)))
     primitive_variables_e[0, 1] = primitive_variables_e[2, 1]/(R_air*T_e[0, 1])
-    # a_e[0, 1] = (gamma*R_air*T_e[0, 1])**(1/2)
     primitive_variables_e[1, 1] = M_e[0, 1]*(gamma*R_air*T_e[0, 1])
     
 r_plus = np.zeros((4, imax + 1))
@@ -229,60 +210,42 @@ def van_leer_limiter():
         if i == 0:
             r_den[[0, 1, 2], 0] = primitive_variables[:, 1] - primitive_variables[:, 0]
             r_den[[3], 0] = T[0, 1] - T[0, 0]
-            # r_den[[4], 0] = a[0, 1] - a[0, 0]
+            
             for g in range(0, 4):
                 if abs(r_den[g, 0]) < 1E-6:
                     r_den[g, 0] = np.sign(r_den[g, 0])*1E-6
             r_plus[[0, 1, 2], 0] = (primitive_variables[:, 2] - primitive_variables[:, 1])/r_den[[0, 1, 2], 0]
             r_plus[3, 0] = (T[0, 2] - T[0, 1])/r_den[3, 0]
-            # r_plus[4, 0] = (a[0, 2] - a[0, 1])/r_den[4, 0]
             
             r_minus[[0, 1, 2], 0] = (primitive_variables[:, 0] - primitive_variables_e[:, 0])/r_den[[0, 1, 2], 0]
             r_minus[3, 0] = (T[0, 0] - T_e[0, 0])/r_den[3, 0]
-            # r_minus[4] = (a[0, 0] - a_e[0, 0])/r_den[4]
-            
-            # psi_plus[:, 0] = (r_plus + np.abs(r_plus))/(1 + r_plus)
-            # psi_minus[:, 0] = (r_minus + np.abs(r_minus))/(1 + r_minus)
-            
-            # ---------- ---------- ---------- ---------- ---------- ----------
-            # CHECK r-?
-            # ---------- ---------- ---------- ---------- ---------- ----------
             
         elif i == imax:
             r_den[[0, 1, 2], imax] = primitive_variables[:, imax + 1] - primitive_variables[:, imax]
             r_den[[3], imax] = T[0, imax + 1] - T[0, imax]
-            # r_den[[4], imax] = a[0, imax + 1] - a[0, imax]
+
             for g in range(0, 4):
                 if abs(r_den[g, imax]) < 1E-6:
                     r_den[g, imax] = np.sign(r_den[g, imax])*1E-6
             r_plus[[0, 1, 2], imax] = (primitive_variables_e[:, 1] - primitive_variables[:, imax + 1])/r_den[[0, 1, 2], imax]
             r_plus[3, imax] = (T_e[0, 1] - T[0, imax + 1])/r_den[3, imax]
-            # r_plus[4] = (a_e[0, 1] - a[0, imax + 1])/r_den[4]
+
             
             r_minus[[0, 1, 2], imax] = (primitive_variables[:, imax] - primitive_variables[:, imax - 1])/r_den[[0, 1, 2], imax]
             r_minus[3, imax] = (T[0, imax] - T[0, imax - 1])/r_den[3, imax]
-            # r_minus[4, imax] = (a[0, imax] - a[0, imax - 1])/r_den[4, imax]
-            
-            # psi_plus[:, imax] = (r_plus + np.abs(r_plus))/(1 + r_plus)
-            # psi_minus[:, imax] = (r_minus + np.abs(r_minus))/(1 + r_minus)
             
         else:
             r_den[[0, 1, 2], i] = primitive_variables[:, i + 1] - primitive_variables[:, i]
             r_den[[3], i] = T[0, i + 1] - T[0, i]
-            # r_den[[4], i] = a[0, i + 1] - a[0, i]
+
             for g in range(0, 4):
                 if abs(r_den[g, i]) < 1E-6:
                     r_den[g, i] = np.sign(r_den[g, i])*1E-6
             r_plus[[0, 1, 2], i] = (primitive_variables[:, i + 2] - primitive_variables[:, i + 1])/r_den[[0, 1, 2], i]
             r_plus[3, i] = (T[0, i + 2] - T[0, i + 1])/r_den[3, i]
-            # r_plus[4, i] = (a[0, i + 2] - a[0, i + 1])/r_den[4]
             
             r_minus[[0, 1, 2], i] = (primitive_variables[:, i] - primitive_variables[:, i - 1])/r_den[[0, 1, 2], i]
             r_minus[3, i] = (T[0, i] - T[0, i - 1])/r_den[3, i]
-            # r_minus[4] = (a[0, i] - a[0, i - 1])/r_den[4]
-            
-            # psi_plus[:, i] = (r_plus + np.abs(r_plus))/(1 + r_plus)
-            # psi_minus[:, i] = (r_minus + np.abs(r_minus))/(1 + r_minus)
         
         psi_plus[:, i] = (r_plus[:, i] + np.abs(r_plus[:, i]))/(1 + r_plus[:, i])
         psi_minus[:, i] = (r_minus[:, i] + np.abs(r_minus[:, i]))/(1 + r_minus[:, i])
@@ -294,7 +257,6 @@ T_R    = np.zeros((1, imax + 1))
 epsilon= 0
 
 def compute_LR_states_2nd_order():
-    # USING 1st ORDER BOUNDAY FLUXES COZ THERE'S NO PSI FOR THE GHOST CELL L/R INTERFACE
     for i in range(imax + 1):
         if i == 0:
             prim_L[:, 0] = primitive_variables[:, 0]
@@ -455,6 +417,11 @@ R_i = np.zeros((3, imax))
 norm = np.zeros((3, 1))
 res = np.zeros((3, 1))
 
+upwind_boundary_conditions_try()
+
+van_leer_1st_order_flux()
+#roe_1st_order_flux()
+
 for i in range(imax):
     R_i[:, i] = F[:, i + 1]*A_intf[i + 1] - F[:, i]*A_intf[i] - S[:, i]*dx
     
@@ -490,7 +457,7 @@ def de_norms():
 
     f3 = open('DE_norms.txt', 'w')
     print('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'P = ' + str(float(DE_norm[2])))
-    f3.write('DE Norms:\n' + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'P = ' + str(float(DE_norm[2])))
+    f3.write('DE Norms:\n' + 'dx =' + str(dx) + 'rho = ' + str(float(DE_norm[0])) + ' ' + 'u = ' + str(float(DE_norm[1])) + ' ' + 'P = ' + str(float(DE_norm[2])))
     f3.close()
 
 print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
@@ -500,12 +467,13 @@ for j in range(nmax + 1):
         epsilon = 1
         cfl = 0.4
         print('---------- Switched to 2nd order ----------')
+        # USE THIS TO SWITCH TO 2ND ORDER, EDIT 'j' to change when the switch happens
     #upwind_boundary_conditions()
     upwind_boundary_conditions_try()
     #van_leer_1st_order_flux()
-    #van_leer_2nd_order_flux()
+    van_leer_2nd_order_flux()
     #roe_1st_order_flux()
-    roe_2nd_order_flux()
+    #roe_2nd_order_flux()
     compute_time_step()
     source_terms()
     primitive_to_conserved_variables()
@@ -515,7 +483,7 @@ for j in range(nmax + 1):
     conserved_to_primitive_variables()
     update_domain_variables()
     out_steady_state_iterative_residuals()
-    if (res[:, :] <= 1E-12).all():
+    if (res[:, :] <= 1E-8).all():
         print('Solution converged in ' + str(j) + ' iterations')
         write_to_file()
         break
@@ -523,5 +491,6 @@ for j in range(nmax + 1):
 if shock_flag == 0:
     de_norms()
     write_exact()
+write_to_file()
 f.close()
 f1.close()
