@@ -112,6 +112,23 @@ def upwind_boundary_conditions_try():
         a[0, imax + 1] = (gamma*primitive_variables[2, imax + 1]/primitive_variables[0, imax + 1])**(1/2)
         M[0, imax + 1] = (((t0/T[:, imax + 1]) - 1)*(2/(gamma - 1)))**0.5
         primitive_variables[1, imax + 1] = M[0, imax + 1]*a[0, imax + 1]
+        
+def set_boundary_conditions():
+    M[0, 0] = 2*M[0, 1] - M[0, 2]
+    primitive_variables[:, 0] = 2*primitive_variables[:, 1] - primitive_variables[:, 2]
+    T[:, 0] = 2*T[:, 1] - T[:, 2]
+    a[:, 0] = 2*a[:, 1] - a[:, 2]
+    
+    M[0, imax + 1] = 2*M[0, imax] - M[0, imax - 1]
+    primitive_variables[(0, 1), imax + 1] = 2*primitive_variables[(0, 1), imax] - primitive_variables[(0, 1), imax - 1]
+    T[:, imax + 1] = 2*T[:, imax] - T[:, imax - 1]
+    a[:, imax + 1] = 2*a[:, imax] - a[:, imax - 1]
+    
+    if shock_flag == 0:
+        primitive_variables[2, imax + 1] = 2*primitive_variables[2, imax] - primitive_variables[2, imax - 1]
+    else:
+        primitive_variables[2, imax + 1] = 2*pback - primitive_variables[2, imax]
+    
 
 F = np.zeros((3, imax + 1))
 
@@ -533,15 +550,16 @@ def de_norms():
 print('Iteration' + " " + 'Continuity' + " " + 'X - mtm' + " " + 'Energy')
 
 for j in range(nmax + 1):
-    if j == 1000:
-        epsilon = 1
-        cfl = 0.4
-        print('---------- Switched to 2nd order ----------')
-        # USE THIS TO SWITCH TO 2ND ORDER, EDIT 'j' to change when the switch happens
+    # if j == 1000:
+    #     epsilon = 1
+    #     cfl = 0.4
+    #     print('---------- Switched to 2nd order ----------')
+    #     # USE THIS TO SWITCH TO 2ND ORDER, EDIT 'j' to change when the switch happens
     #upwind_boundary_conditions()
     upwind_boundary_conditions_try()
-    #van_leer_1st_order_flux()
-    van_leer_2nd_order_flux()
+    #set_boundary_conditions()
+    van_leer_1st_order_flux()
+    #van_leer_2nd_order_flux()
     #roe_1st_order_flux()
     #roe_2nd_order_flux()
     compute_time_step()

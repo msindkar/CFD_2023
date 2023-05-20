@@ -1,4 +1,4 @@
-
+*.cpython-38.pyc
 __pycache__/hw_1_func.cpython-38.pyc
 *.pyc
 *.pyc
@@ -17,3 +17,4 @@ shock_VL_pres.png
 untitled.lpk
 *.png
 *.xy
+*.grd
