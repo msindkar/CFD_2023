@@ -1,3 +1,3 @@
 # CFD code input file
 
-gridname = 'curv2d129.grd'
+gridname = 'curv2d9.grd'
