@@ -1,6 +1,5 @@
-def load_BC_init():    
+def load_BC_init(imax, jmax, x, y):    
     # BC/INIT CALC
-    from mesh_loader import mesh_loader
     from config import supersonic
     import numpy as np
     
@@ -19,8 +18,6 @@ def load_BC_init():
     else:
         print('E: Invalid value in supersonic flag, please check the config.py file')
         raise SystemExit(0)
-        
-    imax, jmax, x, y = mesh_loader()
     
     prim = np.zeros((imax, jmax, 4)) # rho u v p
     
