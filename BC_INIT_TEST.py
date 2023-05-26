@@ -26,9 +26,9 @@ def load_BC_init(imax, jmax, x, y):
     prim[:, :, 2] = phi_v[0]   + phi_v[1]*np.cos(phi_v[3]*np.pi*x/L)     + phi_v[2]*np.sin(phi_v[4]*np.pi*y/L)
     prim[:, :, 3] = phi_p[0]   + phi_p[1]*np.cos(phi_p[3]*np.pi*x/L)     + phi_p[2]*np.sin(phi_p[4]*np.pi*y/L)
     
-    left = prim[:, 0, :]
-    bot  = prim[0, :, :]
-    right= prim[:, jmax - 1, :]
-    up   = prim[imax - 1, :, :]
+    bot   = prim[:, 0, :]
+    left  = prim[0, :, :]
+    up    = prim[:, jmax - 1, :]
+    right = prim[imax - 1, :, :]
     
     return prim, left, bot, right, up
