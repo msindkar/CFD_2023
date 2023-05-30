@@ -42,7 +42,7 @@ def src_mms(R_air, imax, jmax, x_cell, y_cell):
     gamma = 1.4
     
     x = x_cell
-    y = y_cell
+    y = y_cell  # CAREFUL???????
     
     src_array = np.zeros((imax - 1, jmax - 1, 4))
     

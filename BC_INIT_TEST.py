@@ -29,14 +29,20 @@ def load_BC_init(R_air, imax, jmax, x_cell, y_cell):
     
     T[:, :] = prim[:, :, 3]/(prim[:, :, 0]*R_air)
     
-    bot   = prim[:, 0, :]
-    left  = prim[0, :, :]
-    up    = prim[:, jmax - 2, :]
-    right = prim[imax - 2, :, :]
+    bot, up     = np.zeros((jmax - 1, 4)), np.zeros((jmax - 1, 4))
+    left, right = np.zeros((imax - 1, 4)), np.zeros((imax - 1, 4))
     
-    bot_T   = T[:, 0]
-    left_T  = T[0, :]
-    up_T    = T[:, jmax - 2]
-    right_T = T[imax - 2, :]
+    bot[:]   = prim[:, 0, :]
+    left[:]  = prim[0, :, :]
+    up[:]    = prim[:, jmax - 2, :]  # CHECK IMAX OR JMAX
+    right[:] = prim[imax - 2, :, :]
+    
+    bot_T, up_T     = np.zeros(jmax - 1), np.zeros(jmax - 1)
+    left_T, right_T = np.zeros(imax - 1), np.zeros(imax - 1)
+    
+    bot_T[:]   = T[:, 0]
+    left_T[:]  = T[0, :]
+    up_T[:]    = T[:, jmax - 2]
+    right_T[:] = T[imax - 2, :]
     
     return prim, T, left, bot, right, up, left_T, bot_T, right_T, up_T
