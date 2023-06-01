@@ -1,3 +1,4 @@
+import time  as t
 import numpy as np
 
 from mesh_loader  import mesh_loader
@@ -10,7 +11,7 @@ R = 8314        # J/(kmol*K)
 m_air = 28.96   # 
 R_air = R/m_air # Specific gas constant for air
 nmax  = 10000   # max iterations
-j = 0           # current iteration (REMOVE WHEN DONE)
+n = 0           # current iteration (REMOVE WHEN DONE)
 gamma = 1.4
 
 imax, jmax, x, y, x_cell, y_cell = mesh_loader()
@@ -64,9 +65,9 @@ def a_calc():
 a_calc()
 
 ht   = np.zeros((imaxc + 4, jmaxc + 4))
-vel2 = np.zeros((imaxc + 4, jmaxc + 4))
+# vel2 = np.zeros((imaxc + 4, jmaxc + 4))
 def ht_calc():
-    vel2[:, :] = prim[:, :, 1]**2 + prim[:, :, 2]**2
+    vel2 = prim[:, :, 1]**2 + prim[:, :, 2]**2
     ht  [:, :] = ((gamma*R_air)/(gamma - 1))*T[:, :] + (vel2[:, :]**2)/2
 ht_calc()
 
@@ -84,30 +85,72 @@ def mms_boundary_conditions():
     T[alias_ci, jmaxc + 1] = BC_up_T[:]
     T[imaxc + 1, alias_cj] = BC_right_T[:]
 
-def van_leer_flux(j):
-    # for i in range(imax + 1):
-    #     M_L = primitive_variables[1, i]/a[0, i]
-    #     M_R = primitive_variables[1, i + 1]/a[0, i + 1]
-    #     M_plus = (1/4)*(M_L + 1)**2
-    #     M_minus = -(1/4)*(M_R - 1)**2
-    #     beta_L = -max(0, (1 - int(M_L)))
-    #     beta_R = -max(0, (1 - int(M_R)))
-    #     alpha_plus = (1/2)*(1 + np.sign(M_L))
-    #     alpha_minus = (1/2)*(1 - np.sign(M_R))
-    #     c_plus = alpha_plus*(1 + beta_L)*M_L - beta_L*M_plus
-    #     c_minus = alpha_minus*(1 + beta_R)*M_R - beta_R*M_minus
+F_v = np.zeros((imax, jmax - 1, 4))
+F_h = np.zeros((imax - 1, jmax, 4))
+# F_ucap_v = np.zeros((imax, jmax - 1))
+# F_ucap_h = np.zeros((imax - 1, jmax))
+
+# ucap_L_v = np.zeros((jmax - 1))
+# ucap_R_v = np.zeros((jmax - 1))
+
+def van_leer_flux(): # arg is iteration number?
+    st = t.time()
+    for i in np.arange(0, imax): # vertical interface indexing
+        i_p = i + 1
+        ucap_L_v = prim[i_p, alias_cj, 1]*normals_v[i, :, 0] + prim[i_p, alias_cj, 2]*normals_v[i, :, 1]
+        ucap_R_v = prim[i_p + 1, alias_cj, 1]*normals_v[i, :, 0] + prim[i_p + 1, alias_cj, 2]*normals_v[i, :, 1]
+        M_L = ucap_L_v/a[i_p, alias_cj]
+        M_R = ucap_R_v/a[i_p + 1, alias_cj]
+        M_plus = 0.25*(M_L + 1)**2
+        M_minus= -0.25*(M_R + 1)**2
+        beta_L = -np.maximum(np.zeros(np.size(M_L), dtype = int), (1 - M_L.astype(int)))
+        beta_R = -np.maximum(np.zeros(np.size(M_R), dtype = int), (1 - M_R.astype(int)))
+        alpha_plus = (1/2)*(1 + np.sign(M_L))
+        alpha_minus= (1/2)*(1 - np.sign(M_R))
+        c_plus = alpha_plus*(1 + beta_L)*M_L - beta_L*M_plus
+        c_minus= alpha_minus*(1 + beta_R)*M_R - beta_R*M_minus
+        F_C_p = prim[i_p, alias_cj, 0]*a[i_p, alias_cj]*c_plus[:]*np.array([np.ones(jmax - 1), prim[i_p, alias_cj, 1], prim[i_p, alias_cj, 2], ht[i_p, alias_cj]])
+        F_C_m = prim[i_p + 1, alias_cj, 0]*a[i_p + 1, alias_cj]*c_minus[:]*np.array([np.ones(jmax - 1), prim[i_p + 1, alias_cj, 1], prim[i_p + 1, alias_cj, 2], ht[i_p + 1, alias_cj]])
+        P_2bar_plus = M_plus*(- M_L + 2)
+        P_2bar_minus = M_minus*(- M_R - 2)
+        D_plus = alpha_plus*(1 + beta_L) - beta_L*P_2bar_plus
+        D_minus = alpha_minus*(1 + beta_R) - beta_R*P_2bar_minus
+        F_P_p = D_plus*np.array([np.zeros(jmax - 1), normals_v[i, :, 0]*prim[i_p, alias_cj, 3], normals_v[i, :, 1]*prim[i_p, alias_cj, 3], np.zeros(jmax - 1)])
+        F_P_m = D_minus*np.array([np.zeros(jmax - 1), normals_v[i, :, 0]*prim[i_p + 1, alias_cj, 3], normals_v[i, :, 1]*prim[i_p + 1, alias_cj, 3], np.zeros(jmax - 1)])
+        F_C_p = F_C_p.transpose()
+        F_C_m = F_C_m.transpose()
+        F_P_p = F_P_p.transpose()
+        F_P_m = F_P_m.transpose()
+        F_v[i, :, :] = F_C_p + F_P_p + F_C_m + F_P_m
         
-    #     F_C_p = primitive_variables[0, i]*a[0, i]*c_plus*np.array([1, primitive_variables[1, i], ht[0, i]])
-    #     F_C_m = primitive_variables[0, i + 1]*a[0, i + 1]*c_minus*np.array([1, primitive_variables[1, i + 1], ht[0, i + 1]])
-        
-    #     P_2bar_plus = M_plus*(- M_L + 2)
-    #     P_2bar_minus = M_minus*(- M_R - 2)
-    #     D_plus = alpha_plus*(1 + beta_L) - beta_L*P_2bar_plus
-    #     D_minus = alpha_minus*(1 + beta_R) - beta_R*P_2bar_minus
-        
-    #     F_P_p = np.array([0, D_plus*primitive_variables[2, i], 0])
-    #     F_P_m = np.array([0, D_minus*primitive_variables[2, i + 1], 0])
-        
-    #     F[:, i] = F_C_p + F_P_p + F_C_m + F_P_m
-    
-    ''
+    for j in np.arange(0, jmax):
+        j_p = j + 1
+        ucap_L_h = prim[alias_ci, j_p, 1]*normals_h[:, j, 0] + prim[alias_ci, j_p, 2]*normals_h[:, j, 0]
+        ucap_R_h = prim[alias_ci, j_p + 1, 1]*normals_h[:, j, 0] + prim[alias_ci, j_p + 1, 2]*normals_h[:, j, 0]
+        M_L = ucap_L_h/a[alias_ci, j_p]
+        M_R = ucap_R_h/a[alias_ci, j_p + 1]
+        M_plus = 0.25*(M_L + 1)**2
+        M_minus= -0.25*(M_R + 1)**2
+        beta_L = -np.maximum(np.zeros(np.size(M_L), dtype = int), (1 - M_L.astype(int)))
+        beta_R = -np.maximum(np.zeros(np.size(M_R), dtype = int), (1 - M_R.astype(int)))
+        alpha_plus = (1/2)*(1 + np.sign(M_L))
+        alpha_minus= (1/2)*(1 - np.sign(M_R))
+        c_plus = alpha_plus*(1 + beta_L)*M_L - beta_L*M_plus
+        c_minus= alpha_minus*(1 + beta_R)*M_R - beta_R*M_minus
+        F_C_p = prim[alias_ci, j_p, 0]*a[alias_ci, j_p]*c_plus[:]*np.array([np.ones(imax - 1), prim[alias_ci, j_p, 1], prim[alias_ci, j_p, 2], ht[alias_ci, j_p]])
+        F_C_m = prim[alias_ci, j_p + 1, 0]*a[alias_ci, j_p + 1]*c_minus[:]*np.array([np.ones(imax - 1), prim[alias_ci, j_p + 1, 1], prim[alias_ci, j_p + 1, 2], ht[alias_ci, j_p + 1]])
+        P_2bar_plus = M_plus*(- M_L + 2)
+        P_2bar_minus = M_minus*(- M_R - 2)
+        D_plus = alpha_plus*(1 + beta_L) - beta_L*P_2bar_plus
+        D_minus = alpha_minus*(1 + beta_R) - beta_R*P_2bar_minus
+        F_P_p = D_plus*np.array([np.zeros(imax - 1), normals_h[:, j, 0]*prim[alias_ci, j_p, 3], normals_h[:, j, 0]*prim[alias_ci, j_p, 3], np.zeros(imax - 1)])
+        F_P_m = D_minus*np.array([np.zeros(imax - 1), normals_h[:, j, 0]*prim[alias_ci, j_p + 1, 3], normals_h[:, j, 0]*prim[alias_ci, j_p + 1, 3], np.zeros(imax - 1)])
+        F_C_p = F_C_p.transpose()
+        F_C_m = F_C_m.transpose()
+        F_P_p = F_P_p.transpose()
+        F_P_m = F_P_m.transpose()
+        F_h[:, j, :] = F_C_p + F_P_p + F_C_m + F_P_m
+    et = t.time()
+    print('Flux calculated in: ' + str(et - st) + 's')
+
+van_leer_flux()
