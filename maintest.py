@@ -94,10 +94,16 @@ def mms_boundary_conditions():
     T[alias_ci, jmaxc + 1] = BC_up_T[:]
     T[imaxc + 1, alias_cj] = BC_right_T[:]
 
+epsilon = 0 # flux order switch
+
 F_v = np.zeros((imax, jmax - 1, 4))
 F_h = np.zeros((imax - 1, jmax, 4))
+F_v_plus = np.zeros((imax, jmax - 1, 4))
+F_h_plus = np.zeros((imax - 1, jmax, 4))
+F_v_minus= np.zeros((imax, jmax - 1, 4))
+F_h_minus= np.zeros((imax - 1, jmax, 4))
 
-def van_leer_flux(): # arg is iteration number?
+def van_leer_flux(normals_v, normals_h): # arg is iteration number?
     st = t.time()
     for i in np.arange(0, imax): # vertical interface indexing
         i_p = i + 1
@@ -156,8 +162,10 @@ def van_leer_flux(): # arg is iteration number?
         F_h[:, j, :] = F_C_p + F_P_p + F_C_m + F_P_m
     et = t.time()
     print('Flux calculated in: ' + str(et - st) + 's')
+    return F_h[:, :, :], F_v[:, :, :]
 
-van_leer_flux()
+F_h_plus[:, :, :], F_v_plus[:, :, :] = van_leer_flux(normals_v, normals_h)
+F_h_minus[:, :, :], F_v_minus[:, :, :] = van_leer_flux(-normals_v, -normals_h)
 
 cons = np.zeros((imaxc, jmaxc,  4)) # DON'T NEED CONS GHOST CELLS
 
@@ -173,3 +181,17 @@ def conserved_to_primitive_variables():
     prim[2:imaxc + 2, 2:jmaxc + 2, 1] = cons[:, :, 1]/cons[:, :, 0]
     prim[2:imaxc + 2, 2:jmaxc + 2, 2] = cons[:, :, 2]/cons[:, :, 0]
     prim[2:imaxc + 2, 2:jmaxc + 2, 3] = cons[:, :, 3]*(0.4) - 0.5*(0.4)*(prim[2:imaxc + 2, 2:jmaxc + 2, 1]**2 + prim[2:imaxc + 2, 2:jmaxc + 2, 2]**2)
+    
+if flux_scheme == 'vl1':
+    selected_flux = van_leer_flux
+else:
+    print('Invalid value for flux_scheme selection, please check config.py')
+    raise SystemExit(0)
+
+init_norm = np.zeros((4, 1))
+R_i = np.zeros((imaxc, jmaxc, 4))
+norm = np.zeros((4, 1))
+res = np.zeros((4, 1))
+
+def calculate_residuals(): # Cell centered indexing
+    ""
