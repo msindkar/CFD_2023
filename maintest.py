@@ -23,6 +23,7 @@ imaxc, jmaxc = imax - 1, jmax - 1
 
 prim = np.zeros((imaxc + 4, jmaxc + 4, 4))
 prim[2:imaxc + 2, 2:jmaxc + 2, :] = prim1[:, :, :]
+prim[:, :, 0][prim[:, :, 0] == 0.0] = 1
 
 T    = np.zeros((imaxc + 4, jmaxc + 4))
 T[2:imaxc + 2, 2:jmaxc + 2] = T1[:, :]
@@ -64,12 +65,20 @@ def a_calc():
     a[a[:, :] == 0] = 1
 a_calc()
 
+vel2 = np.zeros((imaxc + 4, jmaxc + 4))
+def vel2_calc():
+    vel2[:, :] = prim[:, :, 1]**2 + prim[:, :, 2]**2
+vel2_calc()
+
 ht   = np.zeros((imaxc + 4, jmaxc + 4))
-# vel2 = np.zeros((imaxc + 4, jmaxc + 4))
 def ht_calc():
-    vel2 = prim[:, :, 1]**2 + prim[:, :, 2]**2
-    ht  [:, :] = ((gamma*R_air)/(gamma - 1))*T[:, :] + (vel2[:, :]**2)/2
+    ht  [:, :] = (gamma*R_air*T[:, :])/(gamma - 1) + 0.5*(vel2[:, :])
 ht_calc()
+
+et = np.zeros((imaxc + 4, jmaxc + 4))
+def et_calc():
+    et[:, :] = prim[:, :, 3]/((gamma - 1)*prim[:, :, 0])+ 0.5*(vel2[:, :])
+et_calc()
 
 def M_calc(): # Think about this one
     ''
@@ -87,11 +96,6 @@ def mms_boundary_conditions():
 
 F_v = np.zeros((imax, jmax - 1, 4))
 F_h = np.zeros((imax - 1, jmax, 4))
-# F_ucap_v = np.zeros((imax, jmax - 1))
-# F_ucap_h = np.zeros((imax - 1, jmax))
-
-# ucap_L_v = np.zeros((jmax - 1))
-# ucap_R_v = np.zeros((jmax - 1))
 
 def van_leer_flux(): # arg is iteration number?
     st = t.time()
@@ -154,3 +158,18 @@ def van_leer_flux(): # arg is iteration number?
     print('Flux calculated in: ' + str(et - st) + 's')
 
 van_leer_flux()
+
+cons = np.zeros((imaxc, jmaxc,  4)) # DON'T NEED CONS GHOST CELLS
+
+def primitive_to_conserved_variables():
+    cons[:, :, 0] = prim[2:imaxc + 2, 2:jmaxc + 2, 0]
+    cons[:, :, 1] = prim[2:imaxc + 2, 2:jmaxc + 2, 0]*prim[2:imaxc + 2, 2:jmaxc + 2, 1]
+    cons[:, :, 2] = prim[2:imaxc + 2, 2:jmaxc + 2, 0]*prim[2:imaxc + 2, 2:jmaxc + 2, 2]
+    cons[:, :, 3] = prim[2:imaxc + 2, 2:jmaxc + 2, 0]*et[2:imaxc + 2, 2:jmaxc + 2]
+primitive_to_conserved_variables()
+
+def conserved_to_primitive_variables():
+    prim[2:imaxc + 2, 2:jmaxc + 2, 0] = cons[:, :, 0]
+    prim[2:imaxc + 2, 2:jmaxc + 2, 1] = cons[:, :, 1]/cons[:, :, 0]
+    prim[2:imaxc + 2, 2:jmaxc + 2, 2] = cons[:, :, 2]/cons[:, :, 0]
+    prim[2:imaxc + 2, 2:jmaxc + 2, 3] = cons[:, :, 3]*(0.4) - 0.5*(0.4)*(prim[2:imaxc + 2, 2:jmaxc + 2, 1]**2 + prim[2:imaxc + 2, 2:jmaxc + 2, 2]**2)
