@@ -10,16 +10,47 @@ from config       import flux_scheme
 R = 8314        # J/(kmol*K)
 m_air = 28.96   # 
 R_air = R/m_air # Specific gas constant for air
-nmax  = 10000   # max iterations
-n = 0           # current iteration (REMOVE WHEN DONE)
 gamma = 1.4
+
+nmax  = 10000   # max iterations
+n = 100         # current iteration (REMOVE WHEN DONE)
+cfl = 1
+conv= 0
 
 imax, jmax, x, y, x_cell, y_cell = mesh_loader()
 prim1, T1, BC_left, BC_bot, BC_right, BC_up, BC_left_T, BC_bot_T, BC_right_T, BC_up_T = load_BC_init(R_air, imax, jmax, x_cell, y_cell)
 A_vert, A_hori, normals_h, normals_v = area_normals_calc(imax, jmax, x, y)
 src_array = src_mms(R_air, imax, jmax, x_cell, y_cell)
 
+A_vert4 = np.zeros((imax, jmax - 1, 4))
+A_hori4 = np.zeros((imax - 1, jmax, 4))
+
+for k in np.arange(4):
+    A_vert4[:, :, k] = A_vert[:, :]
+    A_hori4[:, :, k] = A_hori[:, :]
+
 imaxc, jmaxc = imax - 1, jmax - 1
+
+dx = np.zeros((imaxc, jmaxc))
+dy = np.zeros((imaxc, jmaxc))
+
+def calculate_dx_dy():
+    dx1 = np.zeros((imaxc, jmax))
+    dy1 = np.zeros((imax, jmaxc))
+    
+    for i in np.arange(imaxc):
+        dx1[i, :] = x[i + 1, :] - x[i, :]
+    
+    for j in np.arange(jmaxc):
+        dx[:, j] = (dx1[:, j + 1] + dx1[:, j])/2
+        
+    for j in np.arange(jmaxc):
+        dy1[:, j] = y[:, j + 1] - y[:, j]
+    
+    for i in np.arange(imaxc):
+        dy[i, :]= (dy1[i + 1, :] + dy1[i, :])/2
+
+calculate_dx_dy()
 
 prim = np.zeros((imaxc + 4, jmaxc + 4, 4))
 prim[2:imaxc + 2, 2:jmaxc + 2, :] = prim1[:, :, :]
@@ -164,8 +195,14 @@ def van_leer_flux(normals_v, normals_h): # arg is iteration number?
     print('Flux calculated in: ' + str(et - st) + 's')
     return F_h[:, :, :], F_v[:, :, :]
 
-F_h_plus[:, :, :], F_v_plus[:, :, :] = van_leer_flux(normals_v, normals_h)
-F_h_minus[:, :, :], F_v_minus[:, :, :] = van_leer_flux(-normals_v, -normals_h)
+if flux_scheme == 'vl1':
+    selected_flux = van_leer_flux
+else:
+    print('Invalid value for flux_scheme selection, please check config.py')
+    raise SystemExit(0)
+
+F_h_plus[:, :, :], F_v_plus[:, :, :] = selected_flux(normals_v, normals_h)
+F_h_minus[:, :, :], F_v_minus[:, :, :] = selected_flux(-normals_v, -normals_h) # USE THIS TO CALC FLUXES
 
 cons = np.zeros((imaxc, jmaxc,  4)) # DON'T NEED CONS GHOST CELLS
 
@@ -181,17 +218,42 @@ def conserved_to_primitive_variables():
     prim[2:imaxc + 2, 2:jmaxc + 2, 1] = cons[:, :, 1]/cons[:, :, 0]
     prim[2:imaxc + 2, 2:jmaxc + 2, 2] = cons[:, :, 2]/cons[:, :, 0]
     prim[2:imaxc + 2, 2:jmaxc + 2, 3] = cons[:, :, 3]*(0.4) - 0.5*(0.4)*(prim[2:imaxc + 2, 2:jmaxc + 2, 1]**2 + prim[2:imaxc + 2, 2:jmaxc + 2, 2]**2)
-    
-if flux_scheme == 'vl1':
-    selected_flux = van_leer_flux
-else:
-    print('Invalid value for flux_scheme selection, please check config.py')
-    raise SystemExit(0)
 
 init_norm = np.zeros((4, 1))
-R_i = np.zeros((imaxc, jmaxc, 4))
+R_ij = np.zeros((imaxc, jmaxc, 4))
 norm = np.zeros((4, 1))
 res = np.zeros((4, 1))
-
+    
 def calculate_residuals(): # Cell centered indexing
-    ""
+    for i in np.arange(0, imaxc):
+        R_ij[i, :, :] = F_v_plus[i + 1, :, :]*A_vert4[i + 1, :, :] - F_v_minus[i, :, :]*A_vert4[i, :, :] - src_array[i, :, :]
+    for j in np.arange(0, jmaxc):
+        R_ij[:, j, :] = R_ij[:, j, :] + F_h_plus[:, j + 1, :]*A_hori4[:, j + 1, :] - F_h_minus[:, j, :]*A_hori4[:, j, :] #- src_array[:, j, :]
+calculate_residuals()
+
+init_norm[0] = ((np.sum(R_ij[:, :, 0]**2))/(imaxc*jmaxc))**0.5 # continuity
+init_norm[1] = ((np.sum(R_ij[:, :, 1]**2))/(imaxc*jmaxc))**0.5 # x-momentum
+init_norm[2] = ((np.sum(R_ij[:, :, 2]**2))/(imaxc*jmaxc))**0.5 # y-momentum
+init_norm[3] = ((np.sum(R_ij[:, :, 3]**2))/(imaxc*jmaxc))**0.5 # energy
+
+f1 = open('res.dat', 'w')
+f1.write('TITLE = "2D Euler Solver Residuals"\n')
+f1.write('variables="Iteration""Coninuity""X-momentum""Y-momentum""Energy"\n')
+
+def out_steady_state_iterative_residuals():
+    norm[0] = ((np.sum(R_ij[:, :, 0]**2))/(imaxc*jmaxc))**0.5 # continuity
+    norm[1] = ((np.sum(R_ij[:, :, 1]**2))/(imaxc*jmaxc))**0.5 # x-momentum
+    norm[2] = ((np.sum(R_ij[:, :, 2]**2))/(imaxc*jmaxc))**0.5 # y-momentum
+    norm[3] = ((np.sum(R_ij[:, :, 3]**2))/(imaxc*jmaxc))**0.5 # energy
+    
+    res[0] = norm[0]/init_norm[0]
+    res[1] = norm[1]/init_norm[1]
+    res[2] = norm[2]/init_norm[2]
+    res[3] = norm[3]/init_norm[3]
+    
+    if n%100 == 0:
+        f1.write(str(n) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + " " + str(float(res[3])) +'\n')
+        print(str(n) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + " " + str(float(res[3])))
+out_steady_state_iterative_residuals()
+        
+f1.close()

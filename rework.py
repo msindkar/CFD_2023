@@ -13,7 +13,7 @@ m_air = 28.96 #
 R_air = R/m_air # Specific gas constant for air
 pback = 1.2E5
 
-nmax = 50000 # no. of iterations
+nmax = 0 # no. of iterations
 cfl = 0.7
 
 # ---------- Set geometry ----------
