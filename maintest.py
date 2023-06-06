@@ -132,7 +132,7 @@ vel2_calc()
 
 ht   = np.zeros((imaxc + 4, jmaxc + 4))
 def ht_calc():
-    ht  [:, :] = (gamma*R_air*T[:, :])/(gamma - 1) + 0.5*(vel2[:, :])
+    ht  [:, :] = (gamma*prim[:, :, 3])/((gamma - 1)*prim[:, :, 0]) + 0.5*(vel2[:, :])
 ht_calc()
 
 et = np.zeros((imaxc + 4, jmaxc + 4))
@@ -164,7 +164,7 @@ F_v_minus= np.zeros((imax, jmax - 1, 4))
 F_h_minus= np.zeros((imax - 1, jmax, 4))
 
 def van_leer_flux(normals_v, normals_h): # arg is iteration number?
-    st = t.time()
+    # st = t.time()
     for i in np.arange(0, imax): # vertical interface indexing
         i_p = i + 1
         ucap_L_v = prim[i_p, alias_cj, 1]*normals_v[i, :, 0] + prim[i_p, alias_cj, 2]*normals_v[i, :, 1]
@@ -220,8 +220,8 @@ def van_leer_flux(normals_v, normals_h): # arg is iteration number?
         F_P_p = F_P_p.transpose()
         F_P_m = F_P_m.transpose()
         F_h[:, j, :] = F_C_p + F_P_p + F_C_m + F_P_m
-    et = t.time()
-    print('Flux calculated in: ' + str(et - st) + 's')
+    # et = t.time()
+    # print('Flux calculated in: ' + str(et - st) + 's')
     return F_h[:, :, :], F_v[:, :, :]
 
 if flux_scheme == 'vl1':
@@ -288,12 +288,35 @@ lam_h = np.zeros((imaxc, jmaxc))
 lam_v = np.zeros((imaxc, jmaxc))
 
 dt = np.zeros((imaxc, jmaxc))
+dt4 = np.zeros((imaxc, jmaxc, 4))
 
 def compute_time_step():
     lam_v[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_v_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_v_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
     lam_h[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_h_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_v_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
     
-    dt[:, :] = (V)/(lam_v[:, :]*A_v_cell[:, :] + lam_h[:, :]*A_h_cell[:, :])
-compute_time_step()
+    dt[:, :] = cfl*(V)/(lam_v[:, :]*A_v_cell[:, :] + lam_h[:, :]*A_h_cell[:, :])
+    for k in np.arange(4):
+        dt4[:, :, k] = dt[:, :]/V
     
+compute_time_step()
+
+for n in range(nmax + 1):
+    F_h_plus[:, :, :], F_v_plus[:, :, :] = selected_flux(normals_v, normals_h)
+    F_h_minus[:, :, :], F_v_minus[:, :, :] = selected_flux(-normals_v, -normals_h)
+    compute_time_step()
+    # source_terms()
+    primitive_to_conserved_variables()
+    calculate_residuals()
+    cons = cons - R_ij*(dt4)
+    conserved_to_primitive_variables()
+    a_calc()
+    vel2_calc()
+    ht_calc()
+    et_calc()
+    out_steady_state_iterative_residuals()
+    # if (res[:, :] <= 1E-8).all():
+    #     print('Solution converged in ' + str(j) + ' iterations')
+    #     write_to_file()
+    #     break
+
 f1.close()
