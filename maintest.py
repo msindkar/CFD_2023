@@ -11,47 +11,67 @@ R = 8314        # J/(kmol*K)
 m_air = 28.96   # 
 R_air = R/m_air # Specific gas constant for air
 gamma = 1.4
+W = 1
 
 nmax  = 10000   # max iterations
-n = 100         # current iteration (REMOVE WHEN DONE)
+n = 0         # current iteration (REMOVE WHEN DONE)
 cfl = 1
 conv= 0
+
+nan_flag = 0
 
 imax, jmax, x, y, x_cell, y_cell = mesh_loader()
 prim1, T1, BC_left, BC_bot, BC_right, BC_up, BC_left_T, BC_bot_T, BC_right_T, BC_up_T = load_BC_init(R_air, imax, jmax, x_cell, y_cell)
 A_vert, A_hori, normals_h, normals_v = area_normals_calc(imax, jmax, x, y)
 src_array = src_mms(R_air, imax, jmax, x_cell, y_cell)
 
+imaxc, jmaxc = imax - 1, jmax - 1
+
+# ---------- 3D Area array to allow element by element multiplication ----------
 A_vert4 = np.zeros((imax, jmax - 1, 4))
 A_hori4 = np.zeros((imax - 1, jmax, 4))
 
 for k in np.arange(4):
     A_vert4[:, :, k] = A_vert[:, :]
     A_hori4[:, :, k] = A_hori[:, :]
-
-imaxc, jmaxc = imax - 1, jmax - 1
-
+#---------- Calculating cell dx, dy by averaging node dx, dy ----------
 dx = np.zeros((imaxc, jmaxc))
 dy = np.zeros((imaxc, jmaxc))
 
-def calculate_dx_dy():
-    dx1 = np.zeros((imaxc, jmax))
-    dy1 = np.zeros((imax, jmaxc))
-    
-    for i in np.arange(imaxc):
-        dx1[i, :] = x[i + 1, :] - x[i, :]
-    
-    for j in np.arange(jmaxc):
-        dx[:, j] = (dx1[:, j + 1] + dx1[:, j])/2
-        
-    for j in np.arange(jmaxc):
-        dy1[:, j] = y[:, j + 1] - y[:, j]
-    
-    for i in np.arange(imaxc):
-        dy[i, :]= (dy1[i + 1, :] + dy1[i, :])/2
+dx1 = np.zeros((imaxc, jmax))
+dy1 = np.zeros((imax, jmaxc))
 
-calculate_dx_dy()
+for i in np.arange(imaxc):
+    dx1[i, :] = x[i + 1, :] - x[i, :]
 
+for j in np.arange(jmaxc):
+    dx[:, j] = (dx1[:, j + 1] + dx1[:, j])*0.5
+    
+for j in np.arange(jmaxc):
+    dy1[:, j] = y[:, j + 1] - y[:, j]
+
+for i in np.arange(imaxc):
+    dy[i, :]= (dy1[i + 1, :] + dy1[i, :])*0.5
+    
+del dx1, dy1
+#---------- Calculating cell 'volumes' ----------
+V = np.zeros((imaxc, jmaxc))
+
+for j in np.arange(jmaxc):
+    for i in np.arange(imaxc):
+        AC = np.sqrt((x[i + 1, j + 1] - x[i, j])**2 + (y[i + 1, j + 1] - y[i, j])**2)
+        BD = np.sqrt((x[i + 1, j] - x[i, j + 1])**2 + (y[i + 1, j] - y[i, j + 1])**2)
+        V[i, j] = 0.5*W*(AC*BD)
+#---------- Calculating cell centered areas ----------
+A_v_cell = np.zeros((imaxc, jmaxc))
+A_h_cell = np.zeros((imaxc, jmaxc))
+
+for i in np.arange(imaxc):
+    A_v_cell[i, :] = (A_vert[i + 1, :] + A_vert[i, :])*0.5
+    
+for j in np.arange(jmaxc):
+    A_h_cell[:, j] = (A_hori[:, j + 1] + A_hori[:, j])*0.5
+#---------- Assign to arrays with ghost cells ----------
 prim = np.zeros((imaxc + 4, jmaxc + 4, 4))
 prim[2:imaxc + 2, 2:jmaxc + 2, :] = prim1[:, :, :]
 prim[:, :, 0][prim[:, :, 0] == 0.0] = 1
@@ -60,7 +80,16 @@ T    = np.zeros((imaxc + 4, jmaxc + 4))
 T[2:imaxc + 2, 2:jmaxc + 2] = T1[:, :]
 
 del T1, prim1
+#---------- Calculate cell centered averaged normals ----------
+normals_h_c = np.zeros((imaxc, jmaxc, 2))
+normals_v_c = np.zeros((imaxc, jmaxc, 2))
 
+for i in np.arange(imaxc):
+    normals_v_c[i, :] = (normals_v[i + 1, :] + normals_v[i, :])*0.5
+    
+for j in np.arange(jmaxc):
+    normals_h_c[:, j] = (normals_h[:, j + 1] + normals_h[:, j])*0.5
+#--------------------
 alias_ci = list(np.arange(2, imaxc + 2))
 alias_cj = list(np.arange(2, jmaxc + 2))
 
@@ -254,6 +283,17 @@ def out_steady_state_iterative_residuals():
     if n%100 == 0:
         f1.write(str(n) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + " " + str(float(res[3])) +'\n')
         print(str(n) + " " + str(float(res[0])) + " " + str(float(res[1])) + " " + str(float(res[2])) + " " + str(float(res[3])))
-out_steady_state_iterative_residuals()
-        
+
+lam_h = np.zeros((imaxc, jmaxc))
+lam_v = np.zeros((imaxc, jmaxc))
+
+dt = np.zeros((imaxc, jmaxc))
+
+def compute_time_step():
+    lam_v[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_v_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_v_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
+    lam_h[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_h_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_v_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
+    
+    dt[:, :] = (V)/(lam_v[:, :]*A_v_cell[:, :] + lam_h[:, :]*A_h_cell[:, :])
+compute_time_step()
+    
 f1.close()
