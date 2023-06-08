@@ -15,7 +15,7 @@ W = 1
 
 nmax  = 10000   # max iterations
 n = 0         # current iteration (REMOVE WHEN DONE)
-cfl = 1
+cfl = 0.8
 conv= 0
 
 nan_flag = 0
@@ -121,7 +121,7 @@ extrapolate_to_ghost_cells()
 
 a = np.zeros((imaxc + 4, jmaxc + 4))
 def a_calc():
-    a[:, :] = (gamma*R_air*T[:, :])**(0.5)
+    a[:, :] = (gamma*R_air*prim[:, :, 3]/prim[:, :, 0])**(0.5)
     a[a[:, :] == 0] = 1
 a_calc()
 
@@ -296,7 +296,7 @@ def compute_time_step():
     
     dt[:, :] = cfl*(V)/(lam_v[:, :]*A_v_cell[:, :] + lam_h[:, :]*A_h_cell[:, :])
     for k in np.arange(4):
-        dt4[:, :, k] = dt[:, :]/V
+        dt4[:, :, k] = dt[:, :]#/V[:, :]
     
 compute_time_step()
 
