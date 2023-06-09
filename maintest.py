@@ -314,9 +314,9 @@ for n in range(nmax + 1):
     ht_calc()
     et_calc()
     out_steady_state_iterative_residuals()
-    # if (res[:, :] <= 1E-8).all():
-    #     print('Solution converged in ' + str(j) + ' iterations')
-    #     write_to_file()
-    #     break
+    if (res[:, :] <= 1E-8).all():
+        print('Solution converged in ' + str(n) + ' iterations')
+        # write_to_file()
+        break
 
 f1.close()
