@@ -105,23 +105,11 @@ def extrapolate_to_ghost_cells():
     
     prim[imaxc + 2, alias_cj, :] = 2*prim[imaxc + 1, alias_cj, :] - prim[imaxc, alias_cj, :]
     prim[imaxc + 3, alias_cj, :] = 2*prim[imaxc + 2, alias_cj, :] - prim[imaxc + 1, alias_cj, :]
-    
-    T[alias_ci, 1] = 2*T[alias_ci, 2] - T[alias_ci, 3]
-    T[alias_ci, 0] = 2*T[alias_ci, 1] - T[alias_ci, 2]
-    
-    T[alias_ci, jmaxc + 2]  = 2*T[alias_ci, jmaxc + 1] - T[alias_ci, jmaxc]
-    T[alias_ci, jmaxc + 3]  = 2*T[alias_ci, jmaxc + 2] - T[alias_ci, jmaxc + 1]
-    
-    T[1, alias_cj] = 2*T[2, alias_cj] - T[3, alias_cj]
-    T[0, alias_cj] = 2*T[1, alias_cj] - T[2, alias_cj]
-    
-    T[imaxc + 2, alias_cj] = 2*T[imaxc + 1, alias_cj] - T[imaxc, alias_cj]
-    T[imaxc + 3, alias_cj] = 2*T[imaxc + 2, alias_cj] - T[imaxc + 1, alias_cj]
 extrapolate_to_ghost_cells()
 
 a = np.zeros((imaxc + 4, jmaxc + 4))
 def a_calc():
-    a[:, :] = (gamma*R_air*prim[:, :, 3]/prim[:, :, 0])**(0.5)
+    a[:, :] = np.sqrt((gamma*prim[:, :, 3]/prim[:, :, 0]))
     a[a[:, :] == 0] = 1
 a_calc()
 
@@ -301,6 +289,8 @@ def compute_time_step():
 compute_time_step()
 
 for n in range(nmax + 1):
+    #extrapolate_to_ghost_cells()
+    #mms_boundary_conditions()
     F_h_plus[:, :, :], F_v_plus[:, :, :] = selected_flux(normals_v, normals_h)
     F_h_minus[:, :, :], F_v_minus[:, :, :] = selected_flux(-normals_v, -normals_h)
     compute_time_step()
