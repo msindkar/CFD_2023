@@ -13,14 +13,21 @@ R_air = R/m_air # Specific gas constant for air
 gamma = 1.4
 W = 1
 
-nmax  = 10000   # max iterations
+nmax  = 0   # max iterations
 n = 0         # current iteration (REMOVE WHEN DONE)
-cfl = 0.8
+cfl = 0.01
 conv= 0
 
 nan_flag = 0
 
-imax, jmax, x, y, x_cell, y_cell = mesh_loader()
+meshtest = 1
+if meshtest == 1:
+    from test_mesh import test_mesh
+    imax, jmax, x, y, x_cell, y_cell = test_mesh()
+else:
+    imax, jmax, x, y, x_cell, y_cell = mesh_loader()
+    
+# imax, jmax, x, y, x_cell, y_cell = mesh_loader()
 prim1, T1, BC_left, BC_bot, BC_right, BC_up, BC_left_T, BC_bot_T, BC_right_T, BC_up_T = load_BC_init(R_air, imax, jmax, x_cell, y_cell)
 A_vert, A_hori, normals_h, normals_v = area_normals_calc(imax, jmax, x, y)
 src_array = src_mms(R_air, imax, jmax, x_cell, y_cell)
@@ -136,11 +143,6 @@ def mms_boundary_conditions():
     prim[2, alias_cj] = BC_left[:]
     prim[alias_ci, jmaxc + 1] = BC_up[:]
     prim[imaxc + 1, alias_cj] = BC_right[:]
-    
-    T[alias_ci, 2] = BC_bot_T[:]
-    T[2, alias_cj] = BC_left_T[:]
-    T[alias_ci, jmaxc + 1] = BC_up_T[:]
-    T[imaxc + 1, alias_cj] = BC_right_T[:]
 
 epsilon = 0 # flux order switch
 
@@ -179,7 +181,7 @@ def van_leer_flux(normals_v, normals_h): # arg is iteration number?
         F_C_m = F_C_m.transpose()
         F_P_p = F_P_p.transpose()
         F_P_m = F_P_m.transpose()
-        F_v[i, :, :] = F_C_p + F_P_p + F_C_m + F_P_m
+        F_v[i, :, :] = F_C_p[:, :] + F_P_p[:, :] + F_C_m[:, :] + F_P_m[:, :]
         
     for j in np.arange(0, jmax):
         j_p = j + 1
@@ -207,7 +209,7 @@ def van_leer_flux(normals_v, normals_h): # arg is iteration number?
         F_C_m = F_C_m.transpose()
         F_P_p = F_P_p.transpose()
         F_P_m = F_P_m.transpose()
-        F_h[:, j, :] = F_C_p + F_P_p + F_C_m + F_P_m
+        F_h[:, j, :] = F_C_p[:, :] + F_P_p[:, :] + F_C_m[:, :] + F_P_m[:, :]
     # et = t.time()
     # print('Flux calculated in: ' + str(et - st) + 's')
     return F_h[:, :, :], F_v[:, :, :]
@@ -289,15 +291,15 @@ def compute_time_step():
 compute_time_step()
 
 for n in range(nmax + 1):
-    #extrapolate_to_ghost_cells()
     #mms_boundary_conditions()
+    extrapolate_to_ghost_cells()
     F_h_plus[:, :, :], F_v_plus[:, :, :] = selected_flux(normals_v, normals_h)
     F_h_minus[:, :, :], F_v_minus[:, :, :] = selected_flux(-normals_v, -normals_h)
     compute_time_step()
     # source_terms()
     primitive_to_conserved_variables()
     calculate_residuals()
-    cons = cons - R_ij*(dt4)
+    cons[:, :, :] = cons[:, :, :] - R_ij[:, :, :]*(dt4[:, :, :])
     conserved_to_primitive_variables()
     a_calc()
     vel2_calc()
