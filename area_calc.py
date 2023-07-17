@@ -28,8 +28,8 @@ def area_normals_calc(imax, jmax, x, y):
     
     for j in np.arange(jmax):
         for i in np.arange(imax - 1):
-            normals_h[i, j, 0] = (y[i + 1, j] - y[i, j])*W/(A_hori[i, j])
-            normals_h[i, j, 1] =-(x[i + 1, j] - x[i, j])*W/(A_hori[i, j])
+            normals_h[i, j, 0] = (y[i, j] - y[i + 1, j])*W/(A_hori[i, j])
+            normals_h[i, j, 1] =-(x[i, j] - x[i + 1, j])*W/(A_hori[i, j])
     
     et = t.time()
     print("Interface areas and normals calculated in: "+ str(et - st) + "s")

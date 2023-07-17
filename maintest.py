@@ -5,7 +5,7 @@ from mesh_loader  import mesh_loader
 from BC_INIT_TEST import load_BC_init
 from area_calc    import area_normals_calc
 from src_mms      import src_mms
-from config       import flux_scheme
+from config       import flux_scheme, meshtest
 
 R = 8314        # J/(kmol*K)
 m_air = 28.96   # 
@@ -13,21 +13,17 @@ R_air = R/m_air # Specific gas constant for air
 gamma = 1.4
 W = 1
 
-nmax  = 0   # max iterations
+nmax  = 5000   # max iterations
 n = 0         # current iteration (REMOVE WHEN DONE)
-cfl = 0.01
+cfl = 0.0001
 conv= 0
 
-nan_flag = 0
-
-meshtest = 1
 if meshtest == 1:
     from test_mesh import test_mesh
     imax, jmax, x, y, x_cell, y_cell = test_mesh()
 else:
     imax, jmax, x, y, x_cell, y_cell = mesh_loader()
     
-# imax, jmax, x, y, x_cell, y_cell = mesh_loader()
 prim1, T1, BC_left, BC_bot, BC_right, BC_up, BC_left_T, BC_bot_T, BC_right_T, BC_up_T = load_BC_init(R_air, imax, jmax, x_cell, y_cell)
 A_vert, A_hori, normals_h, normals_v = area_normals_calc(imax, jmax, x, y)
 src_array = src_mms(R_air, imax, jmax, x_cell, y_cell)
@@ -82,6 +78,8 @@ for j in np.arange(jmaxc):
 prim = np.zeros((imaxc + 4, jmaxc + 4, 4))
 prim[2:imaxc + 2, 2:jmaxc + 2, :] = prim1[:, :, :]
 prim[:, :, 0][prim[:, :, 0] == 0.0] = 1
+prim[:, :, 1][prim[:, :, 1] == 0.0] = 1
+prim[:, :, 2][prim[:, :, 2] == 0.0] = 1
 
 T    = np.zeros((imaxc + 4, jmaxc + 4))
 T[2:imaxc + 2, 2:jmaxc + 2] = T1[:, :]
@@ -135,8 +133,26 @@ def et_calc():
     et[:, :] = prim[:, :, 3]/((gamma - 1)*prim[:, :, 0])+ 0.5*(vel2[:, :])
 et_calc()
 
+M = np.zeros((imaxc + 4, jmaxc + 4))
 def M_calc(): # Think about this one
-    ''
+    M[:, :] = np.sqrt(vel2[:, :])/a[:, :]
+    M[M[:, :]<= 0.11668889438289902/100] = 0.11668889438289902/100
+    
+psi_M = np.zeros((imaxc + 4, jmaxc + 4))
+def extrapolate_to_ghost_cells_mach():
+    M[alias_ci, 1] = 2*M[alias_ci, 2] - M[alias_ci, 3]
+    M[alias_ci, 0] = 2*M[alias_ci, 1] - M[alias_ci, 2]
+    
+    M[alias_ci, jmaxc + 2]  = 2*M[alias_ci, jmaxc + 1] - M[alias_ci, jmaxc]
+    M[alias_ci, jmaxc + 3]  = 2*M[alias_ci, jmaxc + 2] - M[alias_ci, jmaxc + 1]
+    
+    M[1, alias_cj] = 2*M[2, alias_cj] - M[3, alias_cj]
+    M[0, alias_cj] = 2*M[1, alias_cj] - M[2, alias_cj]
+    
+    M[imaxc + 2, alias_cj] = 2*M[imaxc + 1, alias_cj] - M[imaxc, alias_cj]
+    M[imaxc + 3, alias_cj] = 2*M[imaxc + 2, alias_cj] - M[imaxc + 1, alias_cj]
+    
+    psi_M = 1 + ((gamma - 1)/2)*M[:, :]**2
 
 def mms_boundary_conditions():
     prim[alias_ci, 2] = BC_bot[:]
@@ -162,8 +178,8 @@ def van_leer_flux(normals_v, normals_h): # arg is iteration number?
         M_L = ucap_L_v/a[i_p, alias_cj]
         M_R = ucap_R_v/a[i_p + 1, alias_cj]
         M_plus = 0.25*(M_L + 1)**2
-        M_minus= -0.25*(M_R + 1)**2
-        beta_L = -np.maximum(np.zeros(np.size(M_L), dtype = int), (1 - M_L.astype(int)))
+        M_minus= -0.25*(M_R - 1)**2 #MISTAKE HERE? FIXED?
+        beta_L = -np.maximum(np.zeros(np.size(M_L), dtype = int), (1 - M_L.astype(int)))  #ABS of M???
         beta_R = -np.maximum(np.zeros(np.size(M_R), dtype = int), (1 - M_R.astype(int)))
         alpha_plus = (1/2)*(1 + np.sign(M_L))
         alpha_minus= (1/2)*(1 - np.sign(M_R))
@@ -185,12 +201,12 @@ def van_leer_flux(normals_v, normals_h): # arg is iteration number?
         
     for j in np.arange(0, jmax):
         j_p = j + 1
-        ucap_L_h = prim[alias_ci, j_p, 1]*normals_h[:, j, 0] + prim[alias_ci, j_p, 2]*normals_h[:, j, 0]
-        ucap_R_h = prim[alias_ci, j_p + 1, 1]*normals_h[:, j, 0] + prim[alias_ci, j_p + 1, 2]*normals_h[:, j, 0]
+        ucap_L_h = prim[alias_ci, j_p, 1]*normals_h[:, j, 0] + prim[alias_ci, j_p, 2]*normals_h[:, j, 1]
+        ucap_R_h = prim[alias_ci, j_p + 1, 1]*normals_h[:, j, 0] + prim[alias_ci, j_p + 1, 2]*normals_h[:, j, 1] # MISTAKE HERE? FIXED?
         M_L = ucap_L_h/a[alias_ci, j_p]
         M_R = ucap_R_h/a[alias_ci, j_p + 1]
         M_plus = 0.25*(M_L + 1)**2
-        M_minus= -0.25*(M_R + 1)**2
+        M_minus= -0.25*(M_R - 1)**2 #MISTAKE HERE? FIXED?
         beta_L = -np.maximum(np.zeros(np.size(M_L), dtype = int), (1 - M_L.astype(int)))
         beta_R = -np.maximum(np.zeros(np.size(M_R), dtype = int), (1 - M_R.astype(int)))
         alpha_plus = (1/2)*(1 + np.sign(M_L))
@@ -292,7 +308,6 @@ compute_time_step()
 
 for n in range(nmax + 1):
     #mms_boundary_conditions()
-    extrapolate_to_ghost_cells()
     F_h_plus[:, :, :], F_v_plus[:, :, :] = selected_flux(normals_v, normals_h)
     F_h_minus[:, :, :], F_v_minus[:, :, :] = selected_flux(-normals_v, -normals_h)
     compute_time_step()
@@ -301,8 +316,13 @@ for n in range(nmax + 1):
     calculate_residuals()
     cons[:, :, :] = cons[:, :, :] - R_ij[:, :, :]*(dt4[:, :, :])
     conserved_to_primitive_variables()
+    prim[:, :, 1][prim[:, :, 1] <= 1] = 1
+    prim[:, :, 2][prim[:, :, 2] <= 1] = 1
+    prim[:, :, 3][prim[:, :, 3] <= 1] = 1
     a_calc()
     vel2_calc()
+    M_calc()
+    extrapolate_to_ghost_cells()
     ht_calc()
     et_calc()
     out_steady_state_iterative_residuals()

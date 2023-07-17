@@ -140,7 +140,7 @@ def van_leer_1st_order_flux():
         M_minus = -(1/4)*(M_R - 1)**2
         beta_L = -max(0, (1 - int(M_L)))
         beta_R = -max(0, (1 - int(M_R)))
-        alpha_plus = (1/2)*(1 + np.sign(M_L))
+        alpha_plus = (1/2)*(1 + np.sign(M_L)) #ABS of M???
         alpha_minus = (1/2)*(1 - np.sign(M_R))
         c_plus = alpha_plus*(1 + beta_L)*M_L - beta_L*M_plus
         c_minus = alpha_minus*(1 + beta_R)*M_R - beta_R*M_minus
