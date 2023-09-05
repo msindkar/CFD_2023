@@ -12,24 +12,6 @@ def soln_write(x, y, imax, jmax, prim):
     tec.write('DATAPACKING = BLOCK\n')
     tec.write('VARLOCATION = ([3-6]=CELLCENTERED)\n')
     
-    # for i in np.arange(imax):
-    #     tec.write(' '.join(list(x[i, :].astype('str'))))
-    
-    # for i in np.arange(imax):
-    #     tec.write(' '.join(list(y[i, :].astype('str'))))
-        
-    # for i in np.arange(imax - 1):
-    #     tec.write(' '.join(list(prim[i, :, 0].astype('str'))))
-    
-    # for i in np.arange(imax - 1):
-    #     tec.write(' '.join(list(prim[i, :, 1].astype('str'))))
-        
-    # for i in np.arange(imax - 1):
-    #     tec.write(' '.join(list(prim[i, :, 2].astype('str'))))
-
-    # for i in np.arange(imax - 1):
-    #     tec.write(' '.join(list(prim[i, :, 3].astype('str'))))
-        
     for i in np.arange(imax):
         for j in np.arange(jmax):
             tec.write(str(x[i, j]) + '\n')
