@@ -1,11 +1,12 @@
 import time  as t
 import numpy as np
 
-from mesh_loader  import mesh_loader
-from BC_INIT_TEST import load_BC_init
-from area_calc    import area_normals_calc
-from src_mms      import src_mms
-from config       import flux_scheme, meshtest
+from mesh_loader       import mesh_loader
+from BC_INIT_TEST      import load_BC_init
+from area_calc         import area_normals_calc
+from src_mms           import src_mms
+from src_mms_corrected import src_mms_corrected
+from config            import flux_scheme, meshtest
 
 R = 8314        # J/(kmol*K)
 m_air = 28.96   # 
@@ -13,9 +14,9 @@ R_air = R/m_air # Specific gas constant for air
 gamma = 1.4
 W = 1
 
-nmax  = 0   # max iterations
+nmax  = 0 # max iterations
 n = 0         # current iteration (REMOVE WHEN DONE)
-cfl = 0.0001
+cfl = 0.8
 conv= 0
 
 if meshtest == 1:
@@ -30,6 +31,9 @@ src_array = src_mms(R_air, imax, jmax, x_cell, y_cell)
 
 imaxc, jmaxc = imax - 1, jmax - 1
 
+prim1, src_array = src_mms_corrected(imax, jmax, imaxc, jmaxc, x, y, x_cell, y_cell)
+
+imax, jmax, x, y, x_cell, y_cell = mesh_loader()
 # ---------- 3D Area array to allow element by element multiplication ----------
 A_vert4 = np.zeros((imax, jmax - 1, 4))
 A_hori4 = np.zeros((imax - 1, jmax, 4))
@@ -63,7 +67,7 @@ V = np.zeros((imaxc, jmaxc))
 for j in np.arange(jmaxc):
     for i in np.arange(imaxc):
         AC = np.sqrt((x[i + 1, j + 1] - x[i, j])**2 + (y[i + 1, j + 1] - y[i, j])**2)
-        BD = np.sqrt((x[i + 1, j] - x[i, j + 1])**2 + (y[i + 1, j] - y[i, j + 1])**2)
+        BD = np.sqrt((x[i + 1, j] - x[i, j + 1])**2 + (y[i + 1, j] - y[i, j + 1])**2) # CHECK CROSS PRODUCT HERE
         V[i, j] = 0.5*W*(AC*BD)
         
 V4 =  np.zeros((imaxc, jmaxc, 4))
@@ -279,6 +283,12 @@ def calculate_residuals_corrected():
         R_ij[:, j, :] = R_ij[:, j, :] + F_h_plus[:, j + 1, :]*A_hori4[:, j + 1, :] - F_h_plus[:, j, :]*A_hori4[:, j, :] #- src_array[:, j, :]
 calculate_residuals_corrected()
 
+def zero_boundary_res():
+    R_ij[:, 0, :] = 0
+    R_ij[:, imaxc - 1, :] = 0
+    R_ij[0, :, :] = 0
+    R_ij[jmaxc - 1, :, :] = 0
+
 init_norm[0] = ((np.sum(R_ij[:, :, 0]**2))/(imaxc*jmaxc))**0.5 # continuity
 init_norm[1] = ((np.sum(R_ij[:, :, 1]**2))/(imaxc*jmaxc))**0.5 # x-momentum
 init_norm[2] = ((np.sum(R_ij[:, :, 2]**2))/(imaxc*jmaxc))**0.5 # y-momentum
@@ -311,43 +321,47 @@ dt4 = np.zeros((imaxc, jmaxc, 4))
 
 def compute_time_step():
     lam_v[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_v_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_v_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
-    lam_h[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_h_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_v_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
+    lam_h[:, :] = np.abs(prim[2:imaxc + 2, 2:jmaxc + 2, 1]*normals_h_c[:, :, 0] + prim[2:imaxc + 2, 2:jmaxc + 2, 2]*normals_h_c[:, :, 1]) + a[2:imaxc + 2, 2:jmaxc + 2]
     
     dt[:, :] = cfl*(V)/(lam_v[:, :]*A_v_cell[:, :] + lam_h[:, :]*A_h_cell[:, :])
     for k in np.arange(4):
-        dt4[:, :, k] = dt[:, :]#/V[:, :]
+        dt4[:, :, k] = dt[:, :]
     
 compute_time_step()
 
 for n in range(nmax + 1):
-    prim[:, :, 0][prim[:, :, 0] <= 1E-6] = 1E-6
+    # prim[:, :, 0][prim[:, :, 0] <= 1E-6] = 1E-6
     # prim[:, :, 1][prim[:, :, 1] <= 1E-6] = 1E-6
     # prim[:, :, 2][prim[:, :, 2] <= 1E-6] = 1E-6
     # prim[:, :, 3][prim[:, :, 3] <= 1E-6] = 1E-6
-    #mms_boundary_conditions()
+    mms_boundary_conditions()
     F_h_plus[:, :, :], F_v_plus[:, :, :] = selected_flux(normals_v, normals_h)
     #F_h_minus[:, :, :], F_v_minus[:, :, :] = selected_flux(-normals_v, -normals_h)
     compute_time_step()
-    # source_terms()
     primitive_to_conserved_variables()
     #calculate_residuals()
     calculate_residuals_corrected()
+    zero_boundary_res()
     cons[:, :, :] = cons[:, :, :] - R_ij[:, :, :]*(dt4[:, :, :])
+    # prim[:, :, 0][prim[:, :, 0] <= 1E-6] = 1E-6
+    # prim[:, :, 1][prim[:, :, 1] <= 1E-6] = 1E-6
+    # prim[:, :, 2][prim[:, :, 2] <= 1E-6] = 1E-6
+    # prim[:, :, 3][prim[:, :, 3] <= 1E-6] = 1E-6
     conserved_to_primitive_variables()
-    prim[:, :, 0][prim[:, :, 0] <= 1E-6] = 1E-6
+    # prim[:, :, 0][prim[:, :, 0] <= 1E-6] = 1E-6
     # prim[:, :, 1][prim[:, :, 1] <= 1E-6] = 1E-6
     # prim[:, :, 2][prim[:, :, 2] <= 1E-6] = 1E-6
     # prim[:, :, 3][prim[:, :, 3] <= 1E-6] = 1E-6
     a_calc()
     vel2_calc()
-    extrapolate_to_ghost_cells()
+    #extrapolate_to_ghost_cells()
     ht_calc()
     et_calc()
     out_steady_state_iterative_residuals()
     prim[:, :, 0][prim[:, :, 0] <= 1E-6] = 1E-6
-    # prim[:, :, 1][prim[:, :, 1] <= 1E-6] = 1E-6
-    # prim[:, :, 2][prim[:, :, 2] <= 1E-6] = 1E-6
-    # prim[:, :, 3][prim[:, :, 3] <= 1E-6] = 1E-6
+    prim[:, :, 1][prim[:, :, 1] <= 1E-6] = 1E-6
+    prim[:, :, 2][prim[:, :, 2] <= 1E-6] = 1E-6
+    prim[:, :, 3][prim[:, :, 3] <= 1E-6] = 1E-6
     if (res[:, :] <= 1E-8).all():
         print('Solution converged in ' + str(n) + ' iterations')
         # write_to_file()
